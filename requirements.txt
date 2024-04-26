@@ -1,0 +1,16 @@
+requests
+torch
+pandas
+datasets
+transformers
+accelerate
+numpy
+evaluate
+scikit-learn
+tqdm
+huggingface-hub
+Pillow
+nltk
+rouge
+rouge-score
+absl-py
