@@ -8,7 +8,7 @@ from distilvit.utils import DatasetTokenizer, cached_ds
 
 @cached_ds("docornot")
 def get_dataset(feature_extractor_model, text_decoder_model):
-    ds = load_dataset("tarekziade/docornot")
+    ds = load_dataset("mozilla/docornot")
 
     # we are only taking documents and set the caption to
     # "The image seems to be a textual document."

@@ -12,7 +12,7 @@ IMAGES = [
     "https://huggingface.co/datasets/mishig/sample_images/resolve/main/savanna.jpg",
 ]
 
-image_captioner = pipeline("image-to-text", model="tarekziade/distilvit")
+image_captioner = pipeline("image-to-text", model="mozilla/distilvit")
 original_image_captioner = pipeline(
     "image-to-text", model="nlpconnect/vit-gpt2-image-captioning"
 )

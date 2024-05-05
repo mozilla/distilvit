@@ -2,10 +2,7 @@
 
 Fine-tune a Visual Encoder Decoder model for image captioning.
 
-Results:
-
-- ViT Base + DistilGPT2: https://huggingface.co/tarekziade/distilvit
-- DeiT Tiny + DistilGPT2: https://huggingface.co/tarekziade/deit-tiny-distilgpt2
+Resulting model is available on Hugging Face model hub at https://huggingface.co/mozilla/distilvit
 
 The train script is inspired from https://ankur3107.github.io/blogs/the-illustrated-image-captioning-using-transformers/#references
 
