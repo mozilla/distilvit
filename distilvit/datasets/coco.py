@@ -48,7 +48,7 @@ urls = [
     "http://images.cocodataset.org/annotations/image_info_test2017.zip",
 ]
 
-COCO_DIR = os.path.join(os.path.dirname(__file__), "..", "coco")
+COCO_DIR = os.path.join(os.path.dirname(__file__), "..", "..", "coco")
 
 
 class CocoImagePreprocessor(ImagePreprocessor):
@@ -64,9 +64,9 @@ class CocoImagePreprocessor(ImagePreprocessor):
         self.caption_column = caption_column
         self.image_column = image_column
 
-    def feature_extractor(self, image_paths):
+    def feature_extractor(self, *args, **kw):
         images = []
-        for image_path in image_paths:
+        for image_path in kw['images']:
             try:
                 images.append(Image.open(image_path).convert("RGB"))
             except Exception:

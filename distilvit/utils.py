@@ -6,6 +6,7 @@ from transformers import (
     AutoTokenizer,
     AutoFeatureExtractor,
 )
+from datasets import Dataset
 
 
 MAX_LENGTH = 128
@@ -63,16 +64,18 @@ class DatasetTokenizer:
 
     def __call__(self, ds):
         ds = ds.map(
+            function=self.image_preprocessor,
+            batched=True,
+            #remove_columns=ds.column_names,
+        )
+        ds = ds.map(
+
             lambda example: {
                 self.caption_column: to_gender_neutral(example[self.caption_column])
             }
         )
 
-        return ds.map(
-            function=self.image_preprocessor,
-            batched=True,
-            remove_columns=ds.column_names,
-        )
+        return ds
 
 
 def cached_ds(cache_name):
@@ -211,7 +214,11 @@ def _replace_match(match):
 
 
 def to_gender_neutral(text):
-    return re.sub(GENDER_RE, _replace_match, text)
+    res = re.sub(GENDER_RE, _replace_match, text)
+    if text != res:
+        # to log
+        print(f"{text} => {res}")
+    return res
 
 
 if __name__ == "__main__":

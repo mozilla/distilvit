@@ -199,7 +199,7 @@ def parse_args():
     )
     parser.add_argument(
         "--dataset",
-        default="both",
+        default="all",
         choices=list(DATASETS.values()) + ["all"],
         help="Dataset to use for training",
     )
@@ -240,7 +240,7 @@ def train(args):
         for get_dataset in DATASETS.values():
             datasets.append(
                 get_dataset(
-                    args.feature_extractor_model, args.decoder_model, args.cache_dir
+                    args.feature_extractor_model, args.decoder_model, cache_dir=args.cache_dir
                 )
             )
         combined = DatasetDict()
