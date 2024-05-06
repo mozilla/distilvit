@@ -5,6 +5,7 @@ import re
 from transformers import (
     AutoTokenizer,
     AutoFeatureExtractor,
+    pipeline,
 )
 
 
@@ -67,6 +68,15 @@ class DatasetTokenizer:
             image_column=self.image_column,
         )
         self.logfile = open(logfile, "a+")
+        self.offensivelog = open("offensive.csv", "a+")
+        self.offensive_classifier = pipeline("sentiment-analysis", model="mozilla/pardonmyai")
+
+    def is_offensive(self, text):
+        res = self.offensive_classifier(text)
+        if res[0]["label"] == "OFFENSIVE":
+            self.offensivelog.write(f"{text}\n")
+            return True
+        return False
 
     def logger(self, msg):
         self.logfile.write(msg + "\n")
@@ -78,6 +88,7 @@ class DatasetTokenizer:
         return batch
 
     def __call__(self, ds_name, ds):
+        ds = ds.filter(lambda x: not self.is_offensive(x[self.caption_column])
         ds = ds.map(
             functools.partial(self.cleanup, ds_name),
             batched=True,
@@ -121,7 +132,7 @@ GENDER_DICT = {
     "She": "They",
     "him": "them",
     "Him": "Them",
-    "her": "them",
+    "her": "their",
     "Her": "Them",
     "his": "their",
     "His": "Their",
@@ -221,17 +232,6 @@ GENDER_DICT = {
     "Businessman": "Businessperson",
     "businesswoman": "businessperson",
     "Businesswoman": "Businessperson",
-    # Complete removal
-    "fat": "",
-    "obese": "",
-    "skinny": "",
-    "older": "",
-    "old": "",
-    "Fat": "",
-    "Obese": "",
-    "Skinny": "",
-    "Older": "",
-    "Old": "",
 }
 
 GENDER_RE = r"\b(" + "|".join(re.escape(key) for key in GENDER_DICT.keys()) + r")\b"
