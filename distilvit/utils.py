@@ -6,7 +6,6 @@ from transformers import (
     AutoTokenizer,
     AutoFeatureExtractor,
 )
-from datasets import Dataset
 
 
 MAX_LENGTH = 128
@@ -66,15 +65,11 @@ class DatasetTokenizer:
         ds = ds.map(
             function=self.image_preprocessor,
             batched=True,
-            #remove_columns=ds.column_names,
+            # remove_columns=ds.column_names,
         )
         ds = ds.map(
-
-            lambda example: {
-                self.caption_column: to_gender_neutral(example[self.caption_column])
-            }
+            lambda example: {self.caption_column: cleanup(example[self.caption_column])}
         )
-
         return ds
 
 
@@ -208,23 +203,46 @@ GENDER_DICT = {
 
 GENDER_RE = r"\b(" + "|".join(re.escape(key) for key in GENDER_DICT.keys()) + r")\b"
 
+NUMBERS_DICT = {
+    "two": "some",
+    "three": "some",
+    "four": "some",
+    "five": "some",
+    "six": "many",
+    "seven": "many",
+    "eight": "many",
+    "nine": "many",
+    "ten": "many",
+    "Two": "Some",
+    "Three": "Some",
+    "Four": "Some",
+    "Five": "Some",
+    "Six": "Many",
+    "Seven": "Many",
+    "Eight": "Many",
+    "Nine": "Many",
+    "Ten": "Many",
+}
 
-def _replace_match(match):
-    return GENDER_DICT[match.group(0)]
+NUMBERS_RE = r"\b(" + "|".join(re.escape(key) for key in NUMBERS_DICT.keys()) + r")\b"
 
 
-def to_gender_neutral(text):
-    res = re.sub(GENDER_RE, _replace_match, text)
-    if text != res:
-        # to log
-        print(f"{text} => {res}")
-    return res
+def cleanup(text, logger=print):
+    def _replace_match(dikt, match):
+        return dikt[match.group(0)]
+
+    for regexp, dikt in [(GENDER_RE, GENDER_DICT), (NUMBERS_RE, NUMBERS_DICT)]:
+        res = re.sub(regexp, functools.partial(_replace_match, dikt), text)
+        if text != res:
+            logger(f"{text} => {res}")
+            text = res
+    return text
 
 
 if __name__ == "__main__":
-    text = "A Policeman and a salesman are walking by the road."
-    assert (
-        to_gender_neutral(text)
-        == "A Police Officer and a salesperson are walking by the road."
-    )
-    print(to_gender_neutral("A woman is holding a boy."))
+    for text in [
+        "Four Policemen and a salesman are walking by the road.",
+        "A woman is holding a boy.",
+    ]:
+        res = cleanup(text)
+        print(f"{text} => {res}")
