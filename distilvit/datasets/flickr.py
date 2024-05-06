@@ -16,7 +16,7 @@ def get_dataset(feature_extractor_model, text_decoder_model):
         caption_column="caption",
     )
 
-    ds = ds_tokenizer(ds)
+    ds = ds_tokenizer("flickr30k", ds)
 
     # splitting in train (80%), test (10%), validation (10%)
     ds = ds.train_test_split(test_size=0.2)

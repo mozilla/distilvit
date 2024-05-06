@@ -46,6 +46,7 @@ class DatasetTokenizer:
         caption_column="captions",
         image_column="image",
         image_preprocessor_cls=ImagePreprocessor,
+        logfile="replacements.csv",
     ):
         self.feature_extractor = AutoFeatureExtractor.from_pretrained(
             feature_extractor_model
@@ -60,15 +61,27 @@ class DatasetTokenizer:
             caption_column=self.caption_column,
             image_column=self.image_column,
         )
+        self.logfile = open(logfile, "a+")
 
-    def __call__(self, ds):
+    def logger(self, msg):
+        self.logfile.write(msg + "\n")
+
+    def __call__(self, ds_name, ds):
         ds = ds.map(
             function=self.image_preprocessor,
             batched=True,
             # remove_columns=ds.column_names,
         )
         ds = ds.map(
-            lambda example: {self.caption_column: cleanup(example[self.caption_column])}
+            lambda examples: [
+                {
+                    self.caption_column: cleanup(
+                        ds_name, example[self.caption_column], self.logger
+                    )
+                }
+                for example in examples
+            ],
+            batched=True,
         )
         return ds
 
@@ -226,16 +239,41 @@ NUMBERS_DICT = {
 
 NUMBERS_RE = r"\b(" + "|".join(re.escape(key) for key in NUMBERS_DICT.keys()) + r")\b"
 
+# When we get a combo of replacement words, we replace it with people
+# A man and a woman => a person and a person => people
+COMBINED_DICT = {}
+for replacement in GENDER_DICT.values():
+    if replacement[0].isupper():
+        continue
+    COMBINED_DICT[f"a {replacement} and a {replacement}"] = "people"
+    COMBINED_DICT[f"A {replacement} and a {replacement}"] = "People"
 
-def cleanup(text, logger=print):
+COMBINED_RE = r"\b(" + "|".join(re.escape(key) for key in COMBINED_DICT.keys()) + r")\b"
+
+
+def cleanup(ds_name, text, logger=None):
     def _replace_match(dikt, match):
         return dikt[match.group(0)]
 
-    for regexp, dikt in [(GENDER_RE, GENDER_DICT), (NUMBERS_RE, NUMBERS_DICT)]:
+    # order matters.
+    for regexp, dikt in [
+        (GENDER_RE, GENDER_DICT),
+        (NUMBERS_RE, NUMBERS_DICT),
+        (COMBINED_RE, COMBINED_DICT),
+    ]:
         res = re.sub(regexp, functools.partial(_replace_match, dikt), text)
         if text != res:
-            logger(f"{text} => {res}")
+            if logger is not None:
+                logger(f"{ds_name}|{text}|{res}")
             text = res
+
+    text = text.strip()
+    if text[0].islower():
+        text = text[0].upper() + text[1:]
+
+    if not text.endswith("."):
+        text += "."
+
     return text
 
 
@@ -243,6 +281,7 @@ if __name__ == "__main__":
     for text in [
         "Four Policemen and a salesman are walking by the road.",
         "A woman is holding a boy.",
+        "A man and a woman are sitting on a bench.",
     ]:
-        res = cleanup(text)
+        res = cleanup("test", text)
         print(f"{text} => {res}")

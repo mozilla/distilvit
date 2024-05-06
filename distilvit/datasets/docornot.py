@@ -21,6 +21,6 @@ def get_dataset(feature_extractor_model, text_decoder_model):
         caption_column="caption",
     )
 
-    ds = ds_tokenizer(ds)
+    ds = ds_tokenizer("docornot", ds)
 
     return ds

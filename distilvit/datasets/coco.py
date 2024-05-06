@@ -66,7 +66,7 @@ class CocoImagePreprocessor(ImagePreprocessor):
 
     def feature_extractor(self, *args, **kw):
         images = []
-        for image_path in kw['images']:
+        for image_path in kw["images"]:
             try:
                 images.append(Image.open(image_path).convert("RGB"))
             except Exception:
@@ -105,5 +105,5 @@ def get_dataset(feature_extractor_model, text_decoder_model):
         image_preprocessor_cls=CocoImagePreprocessor,
     )
 
-    ds = ds_tokenizer(ds)
+    ds = ds_tokenizer("coco", ds)
     return ds
