@@ -263,6 +263,8 @@ NUMBERS_RE = r"\b(" + "|".join(re.escape(key) for key in NUMBERS_DICT.keys()) + 
 # A man and a woman => a person and a person => people
 COMBINED_DICT = {}
 for replacement in GENDER_DICT.values():
+    if replacement == "":
+        continue
     if replacement[0].isupper():
         continue
     COMBINED_DICT[f"a {replacement} and a {replacement}"] = "people"

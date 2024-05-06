@@ -32,6 +32,8 @@ else:
     device = torch.device("cpu")
     print("Using CPU.")
 
+os.environ["NCCL_P2P_DISABLE"] = "1"
+os.environ["NCCL_IB_DISABLE"] = "1"
 
 try:
     nltk.data.find("tokenizers/punkt")
@@ -260,12 +262,17 @@ def train(args):
 
     training_args = Seq2SeqTrainingArguments(
         predict_with_generate=True,
-        evaluation_strategy="epoch",
-        per_device_train_batch_size=8,
-        per_device_eval_batch_size=8,
+        evaluation_strategy="steps",
+        save_strategy="steps",
+        per_device_train_batch_size=50,
+        per_device_eval_batch_size=50,
         num_train_epochs=1,
         output_dir=args.checkpoints_dir,
         save_total_limit=10,
+        load_best_model_at_end=True,
+        eval_steps=100,
+        save_steps=100,
+
     )
 
     last_checkpoint = get_last_checkpoint(args.checkpoints_dir)
