@@ -30,12 +30,10 @@ class ImagePreprocessor:
         ).input_ids
 
     def __call__(self, examples):
-
         if isinstance(examples[self.caption_column], list):
             captions = [cap[0] for cap in examples[self.caption_column]]
         else:
             captions = examples[self.caption_column]
-
 
         return {
             "labels": self.tokenize(captions),
@@ -73,9 +71,10 @@ class DatasetTokenizer:
     def logger(self, msg):
         self.logfile.write(msg + "\n")
 
-
     def cleanup(self, ds_name, batch):
-        batch[self.caption_column] = [cleanup(ds_name, label, self.logger) for label in batch[self.caption_column]]
+        batch[self.caption_column] = [
+            cleanup(ds_name, label, self.logger) for label in batch[self.caption_column]
+        ]
         return batch
 
     def __call__(self, ds_name, ds):
@@ -140,6 +139,10 @@ GENDER_DICT = {
     "gentlemen": "folks",
     "Gentlemen": "Folks",
     # Specific roles and occupations
+    "female": "person",  # XXX not sure about this one
+    "male": "person",  # XXX not sure about this one
+    "Female": "Person",  # XXX not sure about this one
+    "Male": "Person",  # XXX not sure about this one
     "man": "person",
     "Man": "Person",
     "woman": "person",
@@ -218,6 +221,17 @@ GENDER_DICT = {
     "Businessman": "Businessperson",
     "businesswoman": "businessperson",
     "Businesswoman": "Businessperson",
+    # Complete removal
+    "fat": "",
+    "obese": "",
+    "skinny": "",
+    "older": "",
+    "old": "",
+    "Fat": "",
+    "Obese": "",
+    "Skinny": "",
+    "Older": "",
+    "Old": "",
 }
 
 GENDER_RE = r"\b(" + "|".join(re.escape(key) for key in GENDER_DICT.keys()) + r")\b"
