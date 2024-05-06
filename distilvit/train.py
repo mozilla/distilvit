@@ -41,6 +41,7 @@ except (LookupError, OSError):
 
 ROOT_DIR = os.path.join(os.path.dirname(__file__), "..")
 MAX_LENGTH = 128
+THE_ANSWER_TO_LIFE_THE_UNIVERSE_AND_EVERYTHING = 42
 
 
 class MetricsLoggerCallback(TrainerCallback):
@@ -240,14 +241,16 @@ def train(args):
         for get_dataset in DATASETS.values():
             datasets.append(
                 get_dataset(
-                    args.feature_extractor_model, args.decoder_model, cache_dir=args.cache_dir
+                    args.feature_extractor_model,
+                    args.decoder_model,
+                    cache_dir=args.cache_dir,
                 )
             )
         combined = DatasetDict()
         for split in datasets[0].keys():
             combined[split] = concatenate_datasets([ds[split] for ds in datasets])
 
-        ds = combined.shuffle(seed=42)
+        ds = combined.shuffle(seed=THE_ANSWER_TO_LIFE_THE_UNIVERSE_AND_EVERYTHING)
     else:
         ds = DATASETS[args.dataset](
             args.feature_extractor_model, args.decoder_model, args.cache_dir

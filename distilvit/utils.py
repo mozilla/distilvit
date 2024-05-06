@@ -30,12 +30,12 @@ class ImagePreprocessor:
         ).input_ids
 
     def __call__(self, examples):
-        model_inputs = {}
-        model_inputs["labels"] = self.tokenize(examples[self.caption_column])
-        model_inputs["pixel_values"] = self.feature_extractor(
-            images=examples[self.image_column], return_tensors="pt"
-        )["pixel_values"]
-        return model_inputs
+        return {
+            "labels": self.tokenize(examples[self.caption_column]),
+            "pixel_values": self.feature_extractor(
+                images=examples[self.image_column], return_tensors="pt"
+            )["pixel_values"],
+        }
 
 
 class DatasetTokenizer:
