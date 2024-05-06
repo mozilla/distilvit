@@ -30,8 +30,15 @@ class ImagePreprocessor:
         ).input_ids
 
     def __call__(self, examples):
+
+        if isinstance(examples[self.caption_column], list):
+            captions = [cap[0] for cap in examples[self.caption_column]]
+        else:
+            captions = examples[self.caption_column]
+
+
         return {
-            "labels": self.tokenize(examples[self.caption_column]),
+            "labels": self.tokenize(captions),
             "pixel_values": self.feature_extractor(
                 images=examples[self.image_column], return_tensors="pt"
             )["pixel_values"],
@@ -66,22 +73,21 @@ class DatasetTokenizer:
     def logger(self, msg):
         self.logfile.write(msg + "\n")
 
+
+    def cleanup(self, ds_name, batch):
+        batch[self.caption_column] = [cleanup(ds_name, label, self.logger) for label in batch[self.caption_column]]
+        return batch
+
     def __call__(self, ds_name, ds):
+        ds = ds.map(
+            functools.partial(self.cleanup, ds_name),
+            batched=True,
+        )
+
         ds = ds.map(
             function=self.image_preprocessor,
             batched=True,
             # remove_columns=ds.column_names,
-        )
-        ds = ds.map(
-            lambda examples: [
-                {
-                    self.caption_column: cleanup(
-                        ds_name, example[self.caption_column], self.logger
-                    )
-                }
-                for example in examples
-            ],
-            batched=True,
         )
         return ds
 
@@ -252,6 +258,10 @@ COMBINED_RE = r"\b(" + "|".join(re.escape(key) for key in COMBINED_DICT.keys()) 
 
 
 def cleanup(ds_name, text, logger=None):
+    # for now we drop extra captions
+    if isinstance(text, list):
+        text = text[0]
+
     def _replace_match(dikt, match):
         return dikt[match.group(0)]
 
