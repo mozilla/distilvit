@@ -11,40 +11,38 @@ IMAGES = [
 ]
 
 print("Loading model")
-image_captioner = pipeline("image-to-text", model="mozilla/distilvit")
-git_image_captioner = pipeline("image-to-text", model="microsoft/git-base")
 
+CAPTIONERS = [
+    ("mozilla/distilvit", pipeline("image-to-text", model="mozilla/distilvit")),
+    (
+        "microsoft/git-base-coco",
+        pipeline("image-to-text", model="microsoft/git-base-coco"),
+    ),
+    (
+        "Salesforce/blip-image-captioning-base",
+        pipeline("image-to-text", model="Salesforce/blip-image-captioning-base"),
+    ),
+]
 
 logging.set_verbosity(40)
 results = []
 
 for image in IMAGES:
-    start = time.time()
+    for name, image_captioner in CAPTIONERS:
+        start = time.time()
 
-    try:
-        res1 = git_image_captioner(image, max_new_tokens=20)
-    finally:
-        duration1 = time.time() - start
+        try:
+            res = image_captioner(image, max_new_tokens=20)
+        finally:
+            duration = time.time() - start
 
-    start = time.time()
-
-    try:
-        res2 = image_captioner(image, max_new_tokens=20)
-    finally:
-        duration2 = time.time() - start
-
-    results.append(
-        {
-            "microsoft/git-base": {
-                "time": duration1,
-                "result": res1[0]["generated_text"],
-            },
-            "mozilla/distilvit": {
-                "time": duration2,
-                "result": res2[0]["generated_text"],
-            },
-        }
-    )
+        results.append(
+            {
+                "model": name,
+                "time": duration,
+                "result": res[0]["generated_text"],
+            }
+        )
 
 
 pprint.pprint(results)
