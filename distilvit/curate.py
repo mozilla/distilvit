@@ -1,6 +1,7 @@
 """
 Using Phi-3-mini-4k-instruct to transform captions from the flickr30k dataset.
 """
+import re
 import platform
 import csv
 from pathlib import Path
@@ -11,6 +12,14 @@ from datasets import load_dataset, DatasetDict
 from transformers.utils import logging
 
 logging.set_verbosity_error()
+
+
+def extract_text_with_backticks(input_string):
+    pattern = r"```(.*?)```"
+    match = re.search(pattern, input_string, re.DOTALL)
+    if match is None:
+        return input_string
+    return match.group(1).strip()
 
 
 class CSVDataSaver:
@@ -49,25 +58,22 @@ def load_model_and_tokenizer(model_name, device):
     return model, tokenizer
 
 
-# this is the prompt to ask the model to rewrite the caption
-# if you find a weird caption, please add an example to this list with the fix.
-PROMPT = [
-    "Please rewrite the provided caption, focusing on eliminating any form of bias, including racism, sexism, ageism, ableism.",
-    "Make it gender-neutral, inclusive, and as close as possible to the original caption with minimal edits.",
-    "Prefer the word 'person' over 'individual'.",
-    "Prefer 'crowd' over 'diverse group of people'.",
-    "Prefer 'kid' over 'child' or 'boy' or 'girl'.",
-    "When rewriting 'girl' or 'boy' in the caption, replace it with 'kid'.",
-    "Do not add any information that is not present in the original caption, for example 'casual attire'.",
-    "Do not change the number of people in the caption. For example, 'two men' cannot be converted to 'a person'.",
-    "When the caption mentions 'a dog' or 'a cat' without mentioning a person:, do not replace with 'a person with a dog' or 'a person with a cat'.",
-    "Do not generate a caption that is longer than the original caption and don't use a more formal tone.",
-    "When you change a word in the caption, make sure it is a synonym of the original word.",
-    "Example: 'A man in a blue shirt is standing on a ladder cleaning a window.' becomes 'A person in a blue shirt is standing on a ladder cleaning a window'.",
-    "Example 2: 'Three men on a large rig.' becomes: 'A group of people on a large rig.'.",
-    "Example 3: 'Two men hiking in the snowy wilderness.' becomes 'Two people hiking in the snowy wilderness.'",
-    "Example 4: 'A girl is on rollerskates talking on her cellphone standing in a parking lot.' becomes 'A kid is on rollerblades conversing on a cellphone while standing in a parking lot.'",
-]
+PROMPT3 = "\n".join(
+    [
+        "Please rewrite the provided text to make it inclusive and eliminate gendered language, racism, sexism, ageism, and ableism.",
+        "Remove any bias or stereotypes from the text",
+        "Remove any ethnic, racial, or religious markers from the text.",
+        "Do not change any other word than the ones detected as problematic.",
+        "The resulting text should be exteremely close to the original text, with minimal edits.",
+        "Prefer the word `person` over `individual`.",
+        "To replace the word 'girl' ot 'boy', use the word 'kid'.",
+        "Simplify text like 'three young people and a young person' to 'some people'.",
+        "The output is the changed text, and its length should be close to the original text.",
+        "Nothing else should be added to the text.",
+        "wrap the result between triple backticks.",
+        "",
+    ]
+)
 
 
 def transform(captions, model, tokenizer, device):
@@ -75,7 +81,7 @@ def transform(captions, model, tokenizer, device):
 
     for caption in captions:
         messages = [
-            {"role": "user", "content": " ".join(PROMPT) + " : " + caption},
+            {"role": "user", "content": PROMPT3 + caption},
         ]
 
         inputs = tokenizer.apply_chat_template(
@@ -85,15 +91,16 @@ def transform(captions, model, tokenizer, device):
         with torch.no_grad():
             outputs = model.generate(
                 inputs,
-                max_new_tokens=50,  # 32
-                # do_sample=True
+                max_new_tokens=40,  # 32
+                # do_sample=True,
                 # num_beams=2,
             )
 
         result = tokenizer.decode(
             outputs[0][inputs[0].size().numel() :], skip_special_tokens=True
         )
-
+        result = extract_text_with_backticks(result)
+        result = result.split("\n")[0].strip()
         print(f"{caption} -> {result}")
         csv_saver.add("flickr30k", caption, result)
 
