@@ -19,7 +19,7 @@ from transformers.trainer_utils import get_last_checkpoint
 from datasets import concatenate_datasets, DatasetDict
 from transformers.trainer_callback import EarlyStoppingCallback
 
-from distilvit.datasets import DATASETS
+from distilvit._datasets import DATASETS
 
 
 if torch.cuda.is_available():
@@ -270,9 +270,8 @@ def train(args):
         output_dir=args.checkpoints_dir,
         save_total_limit=10,
         load_best_model_at_end=True,
-        eval_steps=100,
-        save_steps=100,
-
+        eval_steps=500,
+        save_steps=500,
     )
 
     last_checkpoint = get_last_checkpoint(args.checkpoints_dir)

@@ -7,7 +7,6 @@ import os
 
 import nltk
 from PIL import Image
-from datasets import load_dataset
 from tqdm import tqdm
 from distilvit.utils import DatasetTokenizer, cached_ds, ImagePreprocessor
 
@@ -89,6 +88,8 @@ def get_dataset(feature_extractor_model, text_decoder_model):
         print(f"Downloading {url}...")
         download_file(url, COCO_DIR)
     print("Download complete.")
+
+    from datasets import load_dataset
 
     ds = load_dataset(
         "ydshieh/coco_dataset_script",

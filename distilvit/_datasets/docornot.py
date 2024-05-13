@@ -2,12 +2,13 @@
 Tokenizes the Docornot DS to recognize scanned documents.
 """
 
-from datasets import load_dataset
 from distilvit.utils import DatasetTokenizer, cached_ds
 
 
 @cached_ds("docornot")
 def get_dataset(feature_extractor_model, text_decoder_model):
+    from datasets import load_dataset
+
     ds = load_dataset("mozilla/docornot")
 
     # we're only interested in documents and provide a fixed caption.

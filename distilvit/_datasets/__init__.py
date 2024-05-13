@@ -5,8 +5,8 @@ from .docornot import get_dataset as get_docornot_dataset
 # from .textcaps import get_dataset as get_textcaps_dataset
 
 DATASETS = {
-    "coco": get_coco_dataset,
     "flickr": get_flickr_dataset,
+    # "coco": get_coco_dataset,
     "docornot": get_docornot_dataset,
     # "textcaps": get_textcaps_dataset,
 }
