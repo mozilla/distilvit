@@ -61,6 +61,7 @@ def load_model_and_tokenizer(model_name, device):
 PROMPT3 = """\
 Please rewrite the provided text to make it inclusive and eliminate gendered language, racism, sexism, ageism, and ableism:
 - Remove any bias or stereotypes from the text.
+- Keep animal descriptions intact. For example, 'a black dog' should remain 'a black dog' and not 'a dog'.
 - Remove any ethnic, racial, or religious markers from the text.
 - Avoid changing original verbs to maintain the casual and conversational tone of the text.
 - Use plural forms or collective nouns to keep the language fluid and natural. For example, instead of saying 'a black woman and a white man,' refer to them as 'two people' or 'workers' if they are performing a task.
@@ -69,7 +70,7 @@ Please rewrite the provided text to make it inclusive and eliminate gendered lan
 - Do not make count mistakes. For example, if the original text says 'a little girl', replace it with 'a kid'.
 - Do not try to describe the scene; focus on just rewriting the text as instructed.
 - The output should be a single sentence and its length should be close to the original text.
-- The text should be understandable by a 8 years old, when doing changes, use the simplest words possible.
+- The text should be understandable by an 8 years old. Use the simplest words possible.
 Wrap the result between triple backticks.
 
 """
@@ -129,7 +130,9 @@ def main(test_sample=False):
 
     dataset_name = "nlphuji/flickr30k"
     # model_name = "mistralai/Mistral-7B-Instruct-v0.2"
-    model_name = "microsoft/Phi-3-mini-4k-instruct"
+    model_name = "meta-llama/Meta-Llama-3-8B-Instruct"
+
+    # model_name = "microsoft/Phi-3-mini-4k-instruct"
     batch_size = 10
 
     model, tokenizer = load_model_and_tokenizer(model_name, device)
