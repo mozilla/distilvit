@@ -58,28 +58,21 @@ def load_model_and_tokenizer(model_name, device):
     return model, tokenizer
 
 
-PROMPT3 = "\n".join(
-    [
-        "Please rewrite the provided text to make it inclusive and eliminate gendered language, racism, sexism, ageism, and ableism.",
-        "Remove any bias or stereotypes from the text",
-        "Remove any ethnic, racial, or religious markers from the text.",
-        "Remove any ethnical adjectives or adverbs from the text, like 'asian' or 'spanish'."
-        "Do not remove details for animals. For instance 'a black dog' is acceptable.",
-        "Use plural forms or collective nouns to keep the language fluid and natural. For instance, instead of saying 'a black woman and a white man,' refer to them as 'two people' or 'workers' if they are performing a task.",
-        "The goal is to maintain a natural flow and avoid awkward repetitions while ensuring the description remains clear and true to the original content.",
-        "Do not change any other word than the ones detected as problematic.",
-        "The resulting text should be extremely close to the original text, with minimal edits.",
-        "Prefer the word `person` over `individual`.",
-        "Do not make count mistakes. For example, if the original text says 'a little girl', do not replace it with 'two kids'. Instead, use 'a kid'.",
-        "To replace the word 'girl' ot 'boy', use the word 'kid'.",
-        "Do not try to describe the scene and focus on just rewriting the text as instructed.",
-        "Keep the tone conversational and natural and use simple language. For example do not replace 'climbing' with 'ascending'.",
-        "The output is the changed text, and its length should be close to the original text.",
-        "The output should be a single sentence.",
-        "Wrap the result between triple backticks.",
-        "",
-    ]
-)
+PROMPT3 = """\
+Please rewrite the provided text to make it inclusive and eliminate gendered language, racism, sexism, ageism, and ableism:
+- Remove any bias or stereotypes from the text.
+- Remove any ethnic, racial, or religious markers from the text.
+- Avoid changing original verbs to maintain the casual and conversational tone of the text.
+- Use plural forms or collective nouns to keep the language fluid and natural. For example, instead of saying 'a black woman and a white man,' refer to them as 'two people' or 'workers' if they are performing a task.
+- The goal is to maintain a natural flow and avoid awkward repetitions while ensuring the description remains clear and true to the original content.
+- Prefer the word `person` over `individual`.
+- Do not make count mistakes. For example, if the original text says 'a little girl', replace it with 'a kid'.
+- Do not try to describe the scene; focus on just rewriting the text as instructed.
+- The output should be a single sentence and its length should be close to the original text.
+- The text should be understandable by a 8 years old, when doing changes, use the simplest words possible.
+Wrap the result between triple backticks.
+
+"""
 
 
 def transform(captions, model, tokenizer, device):
