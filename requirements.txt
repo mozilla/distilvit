@@ -1,5 +1,8 @@
 requests
 torch
+readability
+bitsandbytes
+accelerate
 pandas
 datasets
 transformers

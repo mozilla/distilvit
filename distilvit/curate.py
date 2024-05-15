@@ -1,22 +1,21 @@
 """
-Using Phi-3-mini-4k-instruct to transform captions from the flickr30k dataset.
+Using Llama 3 8B Instructto transform captions from the flickr30k dataset.
 """
 import re
 import platform
-import csv
 
 import torch
 from transformers.utils import logging
+import readability
+
 
 logging.set_verbosity_error()
-#torch.set_num_threads(1)
 
 
-dataset_name = "nlphuji/flickr30k"
-# model_name = "mistralai/Mistral-7B-Instruct-v0.2"
-model_name = "meta-llama/Meta-Llama-3-8B-Instruct"
-# model_name = "microsoft/Phi-3-mini-4k-instruct"
-batch_size = 10
+DATASET_NAME = "nlphuji/flickr30k"
+MODEL_NAME = "meta-llama/Meta-Llama-3-8B-Instruct"
+BATCH_SIZE = 10
+
 
 def extract_text_with_backticks(input_string):
     pattern = r"```(.*?)```"
@@ -26,34 +25,7 @@ def extract_text_with_backticks(input_string):
     return match.group(1).strip()
 
 
-def load_model_and_tokenizer(model_name, device):
-    # we have to reduce the memory usage so macbooks don't crash
-    if platform.system() == "Darwin":
-        kw = {
-            "torch_dtype": torch.bfloat16,
-            "low_cpu_mem_usage": True,
-            "trust_remote_code": True,
-        }
-    else:
-        kw = {"trust_remote_code": True,
-
-              }
-    
-    from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
-
-    bnb_config = BitsAndBytesConfig(
-            load_in_4bit=True,
-            bnb_4bit_use_double_quant=True,
-            bnb_4bit_quant_type="nf4",
-            bnb_4bit_compute_dtype=torch.float16,
-    )
-    model = AutoModelForCausalLM.from_pretrained(model_name, device_map="auto", quantization_config=bnb_config, **kw)
-    tokenizer = AutoTokenizer.from_pretrained(model_name)
-    #model.to(device)
-    return model, tokenizer
-
-
-PROMPT3 = """\
+PROMPT = """\
 Please rewrite the provided text to make it inclusive and eliminate gendered language, racism, sexism, ageism, and ableism:
 - Remove any bias or stereotypes from the text.
 - Keep animal descriptions intact. For example, 'a black dog' should remain 'a black dog' and not 'a dog'.
@@ -71,9 +43,8 @@ Wrap the result between triple backticks.
 """
 
 
-
-class Batcher:
-    def __init__(self):
+class TextConverter:
+    def __init__(self, model_name=MODEL_NAME):
         if torch.cuda.is_available():
             device = torch.device("cuda")
             print("Using CUDA (Nvidia GPU).")
@@ -86,23 +57,68 @@ class Batcher:
 
         self.device = device
         self.model = None
+        self.model_name = model_name
+
+    def load_model_and_tokenizer(self):
+        # we have to reduce the memory usage so macbooks don't crash
+        if platform.system() == "Darwin":
+            kw = {
+                "torch_dtype": torch.bfloat16,
+                "low_cpu_mem_usage": True,
+                "trust_remote_code": True,
+            }
+            bnb_config = None
+        else:
+            from transformers import BitsAndBytesConfig
+
+            kw = {
+                "trust_remote_code": True,
+            }
+
+            bnb_config = BitsAndBytesConfig(
+                load_in_4bit=True,
+                bnb_4bit_use_double_quant=True,
+                bnb_4bit_quant_type="nf4",
+                bnb_4bit_compute_dtype=torch.float16,
+            )
+
+        from transformers import AutoModelForCausalLM, AutoTokenizer
+
+        self.model = AutoModelForCausalLM.from_pretrained(
+            self.model_name, device_map="auto", quantization_config=bnb_config, **kw
+        )
+        self.tokenizer = AutoTokenizer.from_pretrained(self.model_name)
 
     def process_batch(self, batch):
         if self.model is None:
-            self.model, self.tokenizer = load_model_and_tokenizer(model_name, self.device)
+            self.load_model_and_tokenizer()
 
+        # need to re-triage the original captions with the new order
         batch["original_caption"] = list(batch["caption"])
-        batch["caption"] = [
-            self.transform(captions) for captions in batch["caption"]
-        ]
+        batch["original_sentids"] = list(batch["sentids"])
+
+        new_captions = []
+        grades = []
+        sentids = []
+
+        for captions, nsentids in zip(batch["caption"], batch["sentids"]):
+            converted, grade, nsentids = self.transform(captions, nsentids)
+            new_captions.append(converted)
+            grades.append(grade)
+            sentids.append(nsentids)
+
+        batch["caption"] = new_captions
+        batch["grade"] = grades
+        batch["sentids"] = sentids
+
         return batch
 
-    def transform(self, captions):
+    def transform(self, captions, sentids):
         transformed_captions = []
 
-        for caption in captions:
+        for caption, sentid in zip(captions, sentids):
             messages = [
-                {"role": "user", "content": PROMPT3 + caption},
+                {"role": "user", "content": PROMPT + caption},
             ]
 
             inputs = self.tokenizer.apply_chat_template(
@@ -112,9 +128,7 @@ class Batcher:
             with torch.no_grad():
                 outputs = self.model.generate(
                     inputs,
-                    max_new_tokens=40,  # 32
-                    # do_sample=True,
-                    # num_beams=2,
+                    max_new_tokens=40,
                 )
 
             result = self.tokenizer.decode(
@@ -122,28 +136,35 @@ class Batcher:
             )
             result = extract_text_with_backticks(result)
             result = result.split("\n")[0].strip()
-            #print(f"{caption} -> {result}")
-            #csv_saver.add("flickr30k", caption, result)
+            grade = dict(
+                readability.getmeasures(result, lang="en")["readability grades"]
+            )
 
-            transformed_captions.append(result)
+            transformed_captions.append((result, grade, sentid))
 
-        return transformed_captions
+        def by_grade(item):
+            return item[1]["DaleChallIndex"]
 
+        transformed_captions.sort(key=by_grade)
+
+        return list(zip(*transformed_captions))
 
 
 def main(test_sample=False):
     from datasets import load_dataset, DatasetDict
 
-    split = "test[:100]" if test_sample else "test"
-    dataset = load_dataset(dataset_name, split=split)
+    split = "test[:10]" if test_sample else "test"
+    dataset = load_dataset(DATASET_NAME, split=split)
 
-    batcher = Batcher()
+    llm_converter = TextConverter()
+
+    num_proc = platform.system() == "Darwin" and 1 or 4
 
     dataset = dataset.map(
-        batcher.process_batch, 
+        llm_converter.process_batch,
         batched=True,
-        batch_size=batch_size,
-        num_proc=4
+        batch_size=BATCH_SIZE,
+        num_proc=num_proc,
     )
 
     dataset_dict = DatasetDict({"test": dataset})
@@ -153,4 +174,4 @@ def main(test_sample=False):
 
 
 if __name__ == "__main__":
-    main(test_sample=False)
+    main(test_sample=True)
