@@ -14,7 +14,7 @@ logging.set_verbosity_error()
 
 DATASET_NAME = "nlphuji/flickr30k"
 MODEL_NAME = "meta-llama/Meta-Llama-3-8B-Instruct"
-BATCH_SIZE = 10
+BATCH_SIZE = platform.system() == "Darwin" and 1 or 10
 
 
 def extract_text_with_backticks(input_string):
@@ -117,28 +117,33 @@ class TextConverter:
         transformed_captions = []
 
         for caption, sentid in zip(captions, sentids):
-            messages = [
-                {"role": "user", "content": PROMPT + caption},
-            ]
+            try:
+                messages = [
+                    {"role": "user", "content": PROMPT + caption},
+                ]
 
-            inputs = self.tokenizer.apply_chat_template(
-                messages, add_generation_prompt=True, return_tensors="pt"
-            ).to(self.device)
+                inputs = self.tokenizer.apply_chat_template(
+                    messages, add_generation_prompt=True, return_tensors="pt"
+                ).to(self.device)
 
-            with torch.no_grad():
-                outputs = self.model.generate(
-                    inputs,
-                    max_new_tokens=40,
+                with torch.no_grad():
+                    outputs = self.model.generate(
+                        inputs,
+                        max_new_tokens=60,
+                    )
+
+                result = self.tokenizer.decode(
+                    outputs[0][inputs[0].size().numel() :], skip_special_tokens=True
                 )
-
-            result = self.tokenizer.decode(
-                outputs[0][inputs[0].size().numel() :], skip_special_tokens=True
-            )
-            result = extract_text_with_backticks(result)
-            result = result.split("\n")[0].strip()
-            grade = dict(
-                readability.getmeasures(result, lang="en")["readability grades"]
-            )
+                result = extract_text_with_backticks(result)
+                result = result.split("\n")[0].strip()
+                grade = dict(
+                    readability.getmeasures(result, lang="en")["readability grades"]
+                )
+            except Exception as e:
+                print(f"Failed to process {caption}: {e}")
+                result = caption
+                grade = {"DaleChallIndex": 10.0}
 
             transformed_captions.append((result, grade, sentid))
 
@@ -153,7 +158,7 @@ class TextConverter:
 def main(test_sample=False):
     from datasets import load_dataset, DatasetDict
 
-    split = "test[:10]" if test_sample else "test"
+    split = "test[:100]" if test_sample else "test"
     dataset = load_dataset(DATASET_NAME, split=split)
 
     llm_converter = TextConverter()
@@ -166,7 +171,8 @@ def main(test_sample=False):
         batch_size=BATCH_SIZE,
         num_proc=num_proc,
     )
-
+    dataset = dataset.rename_column("original_caption", "original_alt_text")
+    dataset = dataset.rename_column("caption", "alt_text")
     dataset_dict = DatasetDict({"test": dataset})
     dataset_dict.save_to_disk("./dataset")
     # pushing on my own space for now.
