@@ -13,6 +13,7 @@ def get_dataset(feature_extractor_model, text_decoder_model):
 
     # keeping only the images flagged with need_training
     ds = ds.filter(lambda x: x["need_training"])
+    ds = ds.map(lambda x: {"inclusive_alt_text": [x["inclusive_alt_text"]]})
 
     ds_tokenizer = DatasetTokenizer(
         feature_extractor_model,
