@@ -84,7 +84,12 @@ def cached_ds(cache_name):
     def _cached_ds(func):
         @functools.wraps(func)
         def wrapper(*args, **kwargs):
-            cache_dir = kwargs.pop("cache_dir", ".cache")
+            if len(args) == 3:
+                cache_dir = args[-1]
+                args = args[:-1]
+            else:
+                cache_dir = kwargs.pop("cache_dir", ".cache")
+
             cached_ds = os.path.join(cache_dir, cache_name)
             if not os.path.exists(cache_dir):
                 os.makedirs(cache_dir)
