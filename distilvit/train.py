@@ -66,7 +66,7 @@ def postprocess_text(preds, labels):
     return preds, labels
 
 
-def compute_metrics(tokenizer, rouge, meteor, eval_preds):
+def compute_metrics(tokenizer, rouge, meteor, bleu, eval_preds):
     preds, labels = eval_preds
     if isinstance(preds, tuple):
         preds = preds[0]
@@ -81,6 +81,10 @@ def compute_metrics(tokenizer, rouge, meteor, eval_preds):
     result["meteor"] = meteor.compute(
         predictions=decoded_preds, references=decoded_labels
     )["meteor"]
+    bleu_result = bleu.compute(predictions=decoded_preds, references=[decoded_labels])[
+        "score"
+    ]
+    result["bleu"] = round(bleu_result, 4)
 
     prediction_lens = [
         np.count_nonzero(pred != tokenizer.pad_token_id) for pred in preds
@@ -177,8 +181,13 @@ def parse_args():
     )
 
     parser.add_argument(
+        "--num-train-epochs", type=int, default=3, help="Number of epochs"
+    )
+
+    parser.add_argument(
         "--encoder-model",
-        default="google/vit-base-patch16-224-in21k",
+        # default="google/vit-base-patch16-224-in21k",
+        default="google/vit-base-patch16-224",
         type=str,
         help="Base model for the encoder",
     )
@@ -190,7 +199,8 @@ def parse_args():
     )
     parser.add_argument(
         "--feature-extractor-model",
-        default="google/vit-base-patch16-224-in21k",
+        # default="google/vit-base-patch16-224-in21k",
+        default="google/vit-base-patch16-224",
         type=str,
         help="Feature extractor model for the encoder",
     )
@@ -203,7 +213,7 @@ def parse_args():
     parser.add_argument(
         "--dataset",
         default="all",
-        choices=list(DATASETS.values()) + ["all"],
+        choices=list(DATASETS.keys()) + ["all"],
         help="Dataset to use for training",
     )
     return parser.parse_args()
@@ -212,6 +222,7 @@ def parse_args():
 def train(args):
     rouge = evaluate.load("rouge")
     meteor = evaluate.load("meteor")
+    bleu = evaluate.load("bleu")
 
     feature_extractor = AutoFeatureExtractor.from_pretrained(
         args.feature_extractor_model
@@ -266,7 +277,7 @@ def train(args):
         save_strategy="steps",
         per_device_train_batch_size=50,
         per_device_eval_batch_size=50,
-        num_train_epochs=1,
+        num_train_epochs=args.num_train_epochs,
         output_dir=args.checkpoints_dir,
         save_total_limit=10,
         load_best_model_at_end=True,
@@ -283,7 +294,7 @@ def train(args):
         model=model,
         tokenizer=feature_extractor,
         args=training_args,
-        compute_metrics=partial(compute_metrics, tokenizer, rouge, meteor),
+        compute_metrics=partial(compute_metrics, tokenizer, rouge, meteor, bleu),
         train_dataset=ds["train"],
         eval_dataset=ds["validation"],
         data_collator=partial(data_collator, tokenizer),
