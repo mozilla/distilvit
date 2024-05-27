@@ -1,48 +1,67 @@
-import time
-import pprint
+import datasets
 from transformers.utils import logging
 from transformers import pipeline
+import argparse
 
 
-IMAGES = [
-    "https://huggingface.co/datasets/mishig/sample_images/resolve/main/airport.jpg",
-    "https://huggingface.co/datasets/mishig/sample_images/resolve/main/football-match.jpg",
-    "https://huggingface.co/datasets/mishig/sample_images/resolve/main/savanna.jpg",
-]
+def main(before, after):
+    # Load the dataset
+    dataset = datasets.load_dataset("mozilla/alt-text-validation")
 
-print("Loading model")
+    # Filter images based on need_training
+    filtered_images = [
+        (item["image"], item["inclusive_alt_text"])
+        for item in dataset["train"]
+        if item["need_training"]
+    ]
 
-CAPTIONERS = [
-    ("mozilla/distilvit", pipeline("image-to-text", model="mozilla/distilvit")),
-    (
-        "microsoft/git-base-coco",
-        pipeline("image-to-text", model="microsoft/git-base-coco"),
-    ),
-    (
-        "Salesforce/blip-image-captioning-base",
-        pipeline("image-to-text", model="Salesforce/blip-image-captioning-base"),
-    ),
-]
+    IMAGES = filtered_images
 
-logging.set_verbosity(40)
-results = []
+    CAPTIONERS = [
+        (
+            "before",
+            pipeline(
+                "image-to-text",
+                model=before,
+                revision="main",
+            ),
+        ),
+        (
+            "after",
+            pipeline(
+                "image-to-text",
+                model=after,
+                revision="main",
+            ),
+        ),
+    ]
 
-for image in IMAGES:
-    for name, image_captioner in CAPTIONERS:
-        start = time.time()
+    logging.set_verbosity(40)
 
-        try:
-            res = image_captioner(image, max_new_tokens=20)
-        finally:
-            duration = time.time() - start
+    for image, inclusive_alt_text in IMAGES:
+        line = [f"expected: {inclusive_alt_text}"]
 
-        results.append(
-            {
-                "model": name,
-                "time": duration,
-                "result": res[0]["generated_text"],
-            }
-        )
+        for name, image_captioner in CAPTIONERS:
+            res = image_captioner(image, max_new_tokens=40)
+            line.append(f"{name}: {res[0]['generated_text']}")
+
+        print(" | ".join(line))
 
 
-pprint.pprint(results)
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Run image captioning models")
+    parser.add_argument(
+        "--before",
+        type=str,
+        help="Path or name of the first model",
+        default="mozilla/distilvit",
+    )
+    parser.add_argument(
+        "--after",
+        type=str,
+        help="Path or name of the second model",
+        default="/Users/tarekziade/Dev/distilvit/distilvit/../vit-base-patch16-224-distilgpt2",
+    )
+    args = parser.parse_args()
+
+    main(args.before, args.after)
