@@ -44,6 +44,7 @@ except (LookupError, OSError):
 ROOT_DIR = os.path.join(os.path.dirname(__file__), "..")
 MAX_LENGTH = 128
 THE_ANSWER_TO_LIFE_THE_UNIVERSE_AND_EVERYTHING = 42
+MODEL_ID = "mozilla/distilvit"
 
 
 class MetricsLoggerCallback(TrainerCallback):
@@ -81,8 +82,9 @@ def compute_metrics(tokenizer, rouge, meteor, bleu, eval_preds):
     result["meteor"] = meteor.compute(
         predictions=decoded_preds, references=decoded_labels
     )["meteor"]
+
     bleu_result = bleu.compute(predictions=decoded_preds, references=[decoded_labels])[
-        "score"
+        "bleu"
     ]
     result["bleu"] = round(bleu_result, 4)
 
@@ -184,6 +186,9 @@ def parse_args():
         "--num-train-epochs", type=int, default=3, help="Number of epochs"
     )
 
+    parser.add_argument("--eval-steps", type=int, default=500, help="Evaluation steps")
+    parser.add_argument("--save-steps", type=int, default=500, help="Save steps")
+
     parser.add_argument(
         "--encoder-model",
         # default="google/vit-base-patch16-224-in21k",
@@ -197,6 +202,9 @@ def parse_args():
         type=str,
         help="Base model to train again from",
     )
+
+    parser.add_argument("--push-to-hub", action="store_true", help="Push to hub")
+
     parser.add_argument(
         "--feature-extractor-model",
         # default="google/vit-base-patch16-224-in21k",
@@ -281,8 +289,8 @@ def train(args):
         output_dir=args.checkpoints_dir,
         save_total_limit=10,
         load_best_model_at_end=True,
-        eval_steps=500,
-        save_steps=500,
+        eval_steps=args.eval_steps,
+        save_steps=args.save_steps,
     )
 
     last_checkpoint = get_last_checkpoint(args.checkpoints_dir)
@@ -310,6 +318,8 @@ def train(args):
     trainer.save_model(save_path)
     tokenizer.save_pretrained(save_path)
     print(f"Model saved to {save_path}")
+    if args.push_to_hub:
+        trainer.push_to_hub(hub_model_id=MODEL_ID)
 
 
 def main():
