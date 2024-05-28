@@ -319,7 +319,7 @@ def train(args):
     tokenizer.save_pretrained(save_path)
     print(f"Model saved to {save_path}")
     if args.push_to_hub:
-        trainer.push_to_hub(hub_model_id=MODEL_ID)
+        trainer.push_to_hub()
 
 
 def main():
