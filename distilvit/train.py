@@ -279,7 +279,7 @@ def train(args):
 
     os.makedirs(args.checkpoints_dir, exist_ok=True)
 
-    training_args = Seq2SeqTrainingArguments(
+    training_args = dict(
         predict_with_generate=True,
         evaluation_strategy="steps",
         save_strategy="steps",
@@ -292,6 +292,12 @@ def train(args):
         eval_steps=args.eval_steps,
         save_steps=args.save_steps,
     )
+
+    if args.push_to_hub:
+        training_args["push_to_hub"] = True
+        training_args["hub_model_id"] = MODEL_ID
+
+    training_args = Seq2SeqTrainingArguments(**training_args)
 
     last_checkpoint = get_last_checkpoint(args.checkpoints_dir)
     metrics_logger_callback = MetricsLoggerCallback(
@@ -318,8 +324,6 @@ def train(args):
     trainer.save_model(save_path)
     tokenizer.save_pretrained(save_path)
     print(f"Model saved to {save_path}")
-    if args.push_to_hub:
-        trainer.push_to_hub()
 
 
 def main():
