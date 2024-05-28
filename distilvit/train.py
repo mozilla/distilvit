@@ -186,8 +186,8 @@ def parse_args():
         "--num-train-epochs", type=int, default=3, help="Number of epochs"
     )
 
-    parser.add_argument("--eval-steps", type=int, default=500, help="Evaluation steps")
-    parser.add_argument("--save-steps", type=int, default=500, help="Save steps")
+    parser.add_argument("--eval-steps", type=int, default=100, help="Evaluation steps")
+    parser.add_argument("--save-steps", type=int, default=100, help="Save steps")
 
     parser.add_argument(
         "--encoder-model",
