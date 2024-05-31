@@ -18,6 +18,7 @@ from transformers import (
 from transformers.trainer_utils import get_last_checkpoint
 from datasets import concatenate_datasets, DatasetDict
 from transformers.trainer_callback import EarlyStoppingCallback
+from huggingface_hub import HfApi
 
 from distilvit._datasets import DATASETS
 
@@ -45,6 +46,7 @@ ROOT_DIR = os.path.join(os.path.dirname(__file__), "..")
 MAX_LENGTH = 128
 THE_ANSWER_TO_LIFE_THE_UNIVERSE_AND_EVERYTHING = 42
 MODEL_ID = "mozilla/distilvit"
+MODEL_CARD = os.path.join(ROOT_DIR, "docs", "model_card.md")
 
 
 class MetricsLoggerCallback(TrainerCallback):
@@ -324,6 +326,15 @@ def train(args):
     trainer.save_model(save_path)
     tokenizer.save_pretrained(save_path)
     print(f"Model saved to {save_path}")
+
+    # pushing model card. XXX add dynamic info
+    api = HfApi()
+    api.upload_file(
+        path_or_fileobj=MODEL_CARD,
+        path_in_repo="README.md",
+        repo_id="mozilla/distilvit",
+        repo_type="model",
+    )
 
 
 def main():
