@@ -19,6 +19,8 @@ from transformers.trainer_utils import get_last_checkpoint
 from datasets import concatenate_datasets, DatasetDict
 from transformers.trainer_callback import EarlyStoppingCallback
 from huggingface_hub import HfApi
+from codecarbon import track_emissions
+
 
 from distilvit._datasets import DATASETS
 
@@ -229,6 +231,7 @@ def parse_args():
     return parser.parse_args()
 
 
+@track_emissions(project_name="mozilla/distilvit")
 def train(args):
     rouge = evaluate.load("rouge")
     meteor = evaluate.load("meteor")
@@ -327,7 +330,7 @@ def train(args):
     tokenizer.save_pretrained(save_path)
     print(f"Model saved to {save_path}")
 
-    # pushing model card. XXX add dynamic info
+    # pushing model card. XXX add dynamic info by reading from codecarbon.csv
     api = HfApi()
     api.upload_file(
         path_or_fileobj=MODEL_CARD,

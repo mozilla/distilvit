@@ -17,3 +17,4 @@ nltk
 rouge
 rouge-score
 absl-py
+codecarbon
