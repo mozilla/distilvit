@@ -108,6 +108,8 @@ This tool will also be used to assess the quality of the model.
 
 Below is an example of an image that is being evaluated by our model which output is compared to an image-to-text of equivalent size, along with the original text provided by the annotator:
 
+![Checkvite example](checkvite.png)
+
 The dataset used in the tool is located here https://huggingface.co/datasets/Mozilla/alt-text-validation
 
 One issue with supervised learning is the scaling. Unless you have thousands of people doing the annotations,
