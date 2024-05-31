@@ -46,7 +46,7 @@ We made the following decisions:
 In an ideal world, we would want to manually change all the image descriptions from The COCO and Flickr30k datasets and train our model again.
 But this would require a lot of resources and time.
 
-To automate this work, we are using `Llama 3 8B Instruct` to rewrite the descriptions and produce curated versions using the following prompt:
+To automate this work, we are using [Llama 3 8B Instruct](https://huggingface.co/meta-llama/Meta-Llama-3-8B-Instruct) to rewrite the descriptions and produce curated versions using the following prompt:
 
 ```
 Please rewrite the provided text to make it inclusive and eliminate gendered language, racism, sexism, ageism, and ableism:
