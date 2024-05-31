@@ -122,5 +122,5 @@ We’ve shown earlier how good LLaVa is at describing images, and evaluating the
 
 ## Adversarial images
 
-To further improve our model, we can also track its weaknesses by trying challenging images, known to degrade the quality of vision models, as described in Natural Adversarial Examples.
+To further improve our model, we can also track its weaknesses by trying challenging images, known to degrade the quality of vision models, as described in [Natural Adversarial Examples](https://arxiv.org/pdf/1907.07174).
 Using those images can help us improve the quality of the training dataset.
