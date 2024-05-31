@@ -95,7 +95,10 @@ Further fine-tuning the model with this modified dataset considerably improved t
 We will also introduce specific images to improve the model’s ability to count objects and detect text documents.
 
 For the latter, they will get a neutral label like “Text document” until we do something better with OCR.
-We’ve created a small dataset based on RVL CDIP small | Kaggle to collect various textual documents that are added alongside the COCO images.
+We’ve created a [small dataset](https://huggingface.co/datasets/Mozilla/docornot) based on `RVL CDIP small` to collect various textual documents that 
+are added alongside the COCO images.
+
+The code to create that DocOrNot dataset is [here](https://github.com/mozilla/docornot/blob/main/build_dataset.py)
 
 ## More supervised learning
 
