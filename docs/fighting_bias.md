@@ -10,9 +10,10 @@ However, they both suffer from biases
 ### Annotators biases
 
 Images are described by humans and that introduces a variety of biases. Annotators might give more weight to details that are not relevant.
-Subtle racism biases may also occur, as some humans will describe a scene differently if a person in the image has a dark skin tone. See [2106.08503] Understanding and Evaluating Racial Biases in Image Captioning
+Subtle racism biases may also occur, as some humans will describe a scene differently if a person in the image has a dark skin tone. See [Understanding and Evaluating Racial Biases in Image Captioning](https://arxiv.org/abs/2106.08503).
 Some annotators are using gender-specific descriptions. People in an image may be described as being a man or a woman, which can lead to the model misgendering people. For instance, a person on a skateboard is almost always described as a man.
-There are similar problems with age-specific terms (man vs. boy etc.). Descriptions may also use less inclusive language or be culturally or personally offensive in some cases. For instance, we have spotted words to describe people in the dataset that are only acceptable for use by and within specific demographics, were replaced by other terms decades ago, or imposed an oddly reductive value (e.g., “sexy”).
+There are similar problems with age-specific terms (man vs. boy etc.). Descriptions may also use less inclusive language or be culturally or personally offensive in some cases. 
+For instance, we have spotted words to describe people in the dataset that are only acceptable for use by and within specific demographics, were replaced by other terms decades ago, or imposed an oddly reductive value (e.g., “sexy”).
 
 ### Class imbalance
 
@@ -87,6 +88,7 @@ Two people, one wearing a short-sleeved black shirt and the other wearing a slee
 ```
 
 The transformed dataset is located here: https://huggingface.co/datasets/Mozilla/flickr30k-transformed-captions
+ad the code to create it is here https://github.com/mozilla/distilvit/blob/main/distilvit/curate.py
 
 Further fine-tuning the model with this modified dataset considerably improved the model’s output.
 
