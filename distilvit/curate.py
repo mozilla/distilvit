@@ -3,7 +3,6 @@ Using Llama 3 8B Instructto transform captions from the flickr30k dataset.
 """
 import re
 import platform
-import os
 
 import torch
 from transformers.utils import logging
@@ -26,22 +25,6 @@ def extract_text_with_backticks(input_string):
     return match.group(1).strip()
 
 
-PROMPT2 = """\
-Please rewrite the provided text to ensure it is inclusive and free from biased language related to gender, age, race, ethnicity, religion, disability, or any other sensitive characteristic:
-- Remove any bias or stereotypes from the text.
-- Keep animal descriptions intact. For example, 'a black dog' should remain 'a black dog' and not 'a dog'.
-- Remove any ethnic, racial, or religious markers from the text.
-- Avoid changing original verbs to maintain the casual and conversational tone of the text.
-- Use plural forms or collective nouns to keep the language fluid and natural. For example, instead of saying 'a black woman and a white man,' refer to them as 'two people' or 'workers' if they are performing a task.
-- The goal is to maintain a natural flow and avoid awkward repetitions while ensuring the description remains clear and true to the original content.
-- Prefer the word `person` over `individual`.
-- Do not make count mistakes. For example, if the original text says 'a little girl', replace it with 'a kid'.
-- Do not try to describe the scene; focus on just rewriting the text as instructed.
-- The output should be a single sentence and its length should be close to the original text.
-- The text should be understandable by an 8-year-old. Use the simplest words possible.
-Wrap the result between triple backticks.
-"""
-
 PROMPT = """\
 Please rewrite the provided text to make it inclusive and eliminate gendered language, racism, sexism, ageism, and ableism:
 - Remove any bias or stereotypes from the text.
@@ -58,40 +41,6 @@ Please rewrite the provided text to make it inclusive and eliminate gendered lan
 Wrap the result between triple backticks.
 
 """
-
-
-def download_file(url, directory):
-    local_filename = url.split("/")[-1]
-    os.makedirs(directory, exist_ok=True)  # Ensure the directory exists
-    path_to_file = os.path.join(directory, local_filename)
-
-    # Only download if the file does not exist
-    if not os.path.exists(path_to_file):
-        with requests.get(url, stream=True) as r:
-            r.raise_for_status()
-            total_size_in_bytes = int(r.headers.get("content-length", 0))
-            block_size = 1024  # 1 Kibibyte
-            progress_bar = tqdm(total=total_size_in_bytes, unit="iB", unit_scale=True)
-            with open(path_to_file, "wb") as f:
-                for chunk in r.iter_content(chunk_size=block_size):
-                    progress_bar.update(len(chunk))
-                    f.write(chunk)
-            progress_bar.close()
-        return path_to_file
-    else:
-        print(f"{local_filename} already exists. Skipping download.")
-        return path_to_file
-
-
-urls = [
-    "http://images.cocodataset.org/zips/train2017.zip",
-    "http://images.cocodataset.org/zips/val2017.zip",
-    "http://images.cocodataset.org/zips/test2017.zip",
-    "http://images.cocodataset.org/annotations/annotations_trainval2017.zip",
-    "http://images.cocodataset.org/annotations/image_info_test2017.zip",
-]
-
-COCO_DIR = "/Volumes/SSD/coco"
 
 
 class TextConverter:
@@ -115,7 +64,7 @@ class TextConverter:
         if platform.system() == "Darwin":
             kw = {
                 "torch_dtype": torch.bfloat16,
-                # "low_cpu_mem_usage": True,
+                "low_cpu_mem_usage": True,
                 "trust_remote_code": True,
             }
             bnb_config = None
@@ -136,47 +85,37 @@ class TextConverter:
         from transformers import AutoModelForCausalLM, AutoTokenizer
 
         self.model = AutoModelForCausalLM.from_pretrained(
-            self.model_name, quantization_config=bnb_config, **kw
+            self.model_name, device_map="auto", quantization_config=bnb_config, **kw
         )
-        self.model.to(self.device)
         self.tokenizer = AutoTokenizer.from_pretrained(self.model_name)
 
     def process_batch(self, batch):
         if self.model is None:
             self.load_model_and_tokenizer()
 
-        flickr = False
+        # need to re-triage the original captions with the new order
+        batch["original_caption"] = list(batch["caption"])
+        batch["original_sentids"] = list(batch["sentids"])
 
-        if flickr:
-            # need to re-triage the original captions with the new order
-            batch["original_caption"] = list(batch["caption"])
-            batch["original_sentids"] = list(batch["sentids"])
+        new_captions = []
+        grades = []
+        sentids = []
 
-            new_captions = []
-            grades = []
-            sentids = []
+        for captions, nsentids in zip(batch["caption"], batch["sentids"]):
+            converted, grade, nsentids = self.transform(captions, nsentids)
+            new_captions.append(converted)
+            grades.append(grade)
+            sentids.append(nsentids)
 
-            for captions, nsentids in zip(batch["caption"], batch["sentids"]):
-                converted, grade, nsentids = self.transform(captions, nsentids)
-                new_captions.append(converted)
-                grades.append(grade)
-                sentids.append(nsentids)
-
-            batch["caption"] = new_captions
-            batch["grade"] = grades
-            batch["sentids"] = sentids
-        else:
-            batch["original_caption"] = batch["caption"]
-            converted, grade, sentids = self.transform(
-                batch["caption"], batch["caption_id"]
-            )
-            batch["caption"] = list(converted)
-            batch["grade"] = list(grade)
+        batch["caption"] = new_captions
+        batch["grade"] = grades
+        batch["sentids"] = sentids
 
         return batch
 
     def transform(self, captions, sentids):
         transformed_captions = []
+
         for caption, sentid in zip(captions, sentids):
             try:
                 messages = [
@@ -212,26 +151,15 @@ class TextConverter:
             return item[1]["DaleChallIndex"]
 
         transformed_captions.sort(key=by_grade)
+
         return list(zip(*transformed_captions))
 
 
 def main(test_sample=False):
-    from datasets import load_dataset, DatasetDict, Dataset
+    from datasets import load_dataset, DatasetDict
 
     split = "test[:100]" if test_sample else "test"
-    # dataset = load_dataset(DATASET_NAME, split=split)
-    for url in urls:
-        print(f"Downloading {url}...")
-        download_file(url, COCO_DIR)
-        print("Download complete.")
-
-    dataset = load_dataset(
-        "ydshieh/coco_dataset_script",
-        "2017",
-        data_dir=COCO_DIR,
-        trust_remote_code=True,
-    )
-    dataset = Dataset.from_dict(dataset["train"][:10])
+    dataset = load_dataset(DATASET_NAME, split=split)
 
     llm_converter = TextConverter()
 
@@ -248,7 +176,7 @@ def main(test_sample=False):
     dataset_dict = DatasetDict({"test": dataset})
     dataset_dict.save_to_disk("./dataset")
     # pushing on my own space for now.
-    dataset_dict.push_to_hub("tarekziade/coco-transformed-captions")
+    dataset_dict.push_to_hub("mozilla/flickr30k-transformed-captions")
 
 
 if __name__ == "__main__":
