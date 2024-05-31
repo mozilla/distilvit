@@ -12,7 +12,7 @@ However, they both suffer from biases
 Images are described by humans and that introduces a variety of biases. Annotators might give more weight to details that are not relevant.
 Subtle racism biases may also occur, as some humans will describe a scene differently if a person in the image has a dark skin tone. See [Understanding and Evaluating Racial Biases in Image Captioning](https://arxiv.org/abs/2106.08503).
 Some annotators are using gender-specific descriptions. People in an image may be described as being a man or a woman, which can lead to the model misgendering people. For instance, a person on a skateboard is almost always described as a man.
-There are similar problems with age-specific terms (man vs. boy etc.). Descriptions may also use less inclusive language or be culturally or personally offensive in some cases. 
+There are similar problems with age-specific terms (man vs. boy etc.). Descriptions may also use less inclusive language or be culturally or personally offensive in some cases.
 For instance, we have spotted words to describe people in the dataset that are only acceptable for use by and within specific demographics, were replaced by other terms decades ago, or imposed an oddly reductive value (e.g., “sexy”).
 
 ### Class imbalance
@@ -95,7 +95,7 @@ Further fine-tuning the model with this modified dataset considerably improved t
 We will also introduce specific images to improve the model’s ability to count objects and detect text documents.
 
 For the latter, they will get a neutral label like “Text document” until we do something better with OCR.
-We’ve created a [small dataset](https://huggingface.co/datasets/Mozilla/docornot) based on `RVL CDIP small` to collect various textual documents that 
+We’ve created a [small dataset](https://huggingface.co/datasets/Mozilla/docornot) based on `RVL CDIP small` to collect various textual documents that
 are added alongside the COCO images.
 
 The code to create that DocOrNot dataset is [here](https://github.com/mozilla/docornot/blob/main/build_dataset.py)
@@ -108,7 +108,7 @@ This tool will also be used to assess the quality of the model.
 
 Below is an example of an image that is being evaluated by our model which output is compared to an image-to-text of equivalent size, along with the original text provided by the annotator:
 
-![Checkvite example](checkvite.png)
+![Checkvite example](checkvite2.png)
 
 The dataset used in the tool is located here https://huggingface.co/datasets/Mozilla/alt-text-validation
 
