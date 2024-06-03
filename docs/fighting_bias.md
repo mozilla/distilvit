@@ -88,7 +88,7 @@ Two people, one wearing a short-sleeved black shirt and the other wearing a slee
 ```
 
 The transformed dataset is located here: https://huggingface.co/datasets/Mozilla/flickr30k-transformed-captions
-ad the code to create it is here https://github.com/mozilla/distilvit/blob/main/distilvit/curate.py
+and the code to create it is here https://github.com/mozilla/distilvit/blob/main/distilvit/curate.py
 
 Further fine-tuning the model with this modified dataset considerably improved the model’s output.
 
