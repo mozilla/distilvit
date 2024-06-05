@@ -18,3 +18,4 @@ rouge
 rouge-score
 absl-py
 codecarbon
+setuptools

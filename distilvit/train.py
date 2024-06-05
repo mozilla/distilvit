@@ -1,4 +1,9 @@
 import os
+
+os.environ["NCCL_P2P_DISABLE"] = "1"
+os.environ["NCCL_IB_DISABLE"] = "1"
+os.environ["PYTORCH_ENABLE_MPS_FALLBACK"] = "1"
+
 from functools import partial
 import torch
 from collections.abc import Mapping
@@ -20,23 +25,24 @@ from datasets import concatenate_datasets, DatasetDict
 from transformers.trainer_callback import EarlyStoppingCallback
 from huggingface_hub import HfApi
 from codecarbon import track_emissions
-
+from torch.quantization import (
+    QConfig,
+    default_qconfig,
+    prepare_qat,
+    convert,
+    FakeQuantize,
+)
 
 from distilvit._datasets import DATASETS
 
 
-if torch.cuda.is_available():
-    device = torch.device("cuda")
-    print("Using CUDA (Nvidia GPU).")
-elif torch.backends.mps.is_available():
-    device = torch.device("mps")
-    print("Using MPS (Apple Silicon GPU).")
-else:
-    device = torch.device("cpu")
-    print("Using CPU.")
+def get_device():
+    if torch.cuda.is_available():
+        return "cuda"
+    elif torch.backends.mps.is_available():
+        return "mps"
+    return "cpu"
 
-os.environ["NCCL_P2P_DISABLE"] = "1"
-os.environ["NCCL_IB_DISABLE"] = "1"
 
 try:
     nltk.data.find("tokenizers/punkt")
@@ -206,6 +212,20 @@ def parse_args():
         type=str,
         help="Base model to train again from",
     )
+    parser.add_argument(
+        "--device",
+        default=get_device(),
+        type=str,
+        choices=["cpu", "cuda", "mps"],
+        help="Base model to train again from",
+    )
+
+    parser.add_argument(
+        "--base-model-revision",
+        default=None,
+        type=str,
+        help="Base model revision",
+    )
 
     parser.add_argument("--push-to-hub", action="store_true", help="Push to hub")
 
@@ -241,12 +261,20 @@ def train(args):
         args.feature_extractor_model
     )
     if args.base_model:
-        model = VisionEncoderDecoderModel.from_pretrained(args.base_model)
+        if args.base_model_revision:
+            model = VisionEncoderDecoderModel.from_pretrained(
+                args.base_model, revision=args.base_model_revision
+            )
+        else:
+            model = VisionEncoderDecoderModel.from_pretrained(args.base_model)
     else:
         model = VisionEncoderDecoderModel.from_encoder_decoder_pretrained(
             args.encoder_model, args.decoder_model
         )
-    model.to(device)
+
+    args.device = torch.device(args.device)
+    print("Using device", args.device)
+    model.to(args.device)
 
     tokenizer = AutoTokenizer.from_pretrained(args.decoder_model)
     # GPT2 only has bos/eos tokens but not decoder_start/pad tokens
@@ -326,6 +354,31 @@ def train(args):
         trainer.train(resume_from_checkpoint=last_checkpoint)
     else:
         trainer.train()
+
+    # add a Quantization Aware Training step
+    qconfig = QConfig(
+        activation=FakeQuantize.with_args(
+            observer=torch.quantization.MinMaxObserver,
+            quant_min=0,
+            quant_max=255,
+            dtype=torch.quint8,
+        ),
+        weight=FakeQuantize.with_args(
+            observer=torch.quantization.PerChannelMinMaxObserver,
+            quant_min=-128,
+            quant_max=127,
+            dtype=torch.qint8,
+            qscheme=torch.per_channel_symmetric,
+        ),
+    )
+
+    model.qconfig = qconfig
+
+    prepare_qat(model, inplace=True)
+    model.to(args.device)
+
+    trainer.train()
+
     trainer.save_model(save_path)
     tokenizer.save_pretrained(save_path)
     print(f"Model saved to {save_path}")
