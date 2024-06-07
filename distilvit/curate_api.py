@@ -28,12 +28,12 @@ You will make it inclusive and eliminate gendered language, racism, sexism, agei
 """
 
 DATASET_NAME = "nlphuji/flickr30k"
-BATCH_SIZE = 10
+BATCH_SIZE = 25
 
 
 class LLMService:
-    def __init__(self, model):
-        self.base_url = "http://10.0.0.40:11434"
+    def __init__(self, model, url="http://10.0.0.40:8080"):
+        self.base_url = url
         self.model = model
 
     def generate_completion(self, prompt):
@@ -54,36 +54,42 @@ class LLMService:
         res = match.group(1).strip()
         return res
 
+    def process_caption(self, caption):
+        try:
+            return self.extract_text_with_backticks(
+                self.generate_completion(PROMPT % str(caption))
+            )
+        except Exception as e:
+            print(f"Error: {e}")
+            return caption[0]
+
     def process_batch(self, batch):
         batch["original_caption"] = list(batch["caption"])
         new_captions = []
 
-        for captions in batch["caption"]:
-            converted = self.extract_text_with_backticks(
-                self.generate_completion(PROMPT % str(captions))
-            )
-            new_captions.append([converted])
+        for caption in batch["caption"]:
+            new_captions.append([self.process_caption(caption)])
 
         batch["caption"] = new_captions
         return batch
 
 
 if __name__ == "__main__":
-    num_proc = platform.system() == "Darwin" and 1 or 4
-    llama_service = LLMService("llama3:70b")
-
-    split = "test[:100]"
+    # num_proc = platform.system() == "Darwin" and 4 or 8
+    service = LLMService("llama3:70b", "http://10.0.0.40:8282")
+    split = "test"
     dataset = load_dataset(DATASET_NAME, split=split)
+    # dataset.cleanup_cache_files()
 
     dataset = dataset.map(
-        llama_service.process_batch,
+        service.process_batch,
         batched=True,
         batch_size=BATCH_SIZE,
-        num_proc=num_proc,
+        num_proc=1,
     )
 
     dataset = dataset.rename_column("original_caption", "original_alt_text")
     dataset = dataset.rename_column("caption", "alt_text")
     dataset_dict = DatasetDict({"test": dataset})
     dataset_dict.save_to_disk("./dataset")
-    dataset_dict.push_to_hub("tarekziade/flickr30k-transformed-captions")
+    dataset_dict.push_to_hub("mozilla/flickr30k-transformed-captions")
