@@ -3,48 +3,55 @@ Using Llama 3 8B Instructto transform captions from the flickr30k dataset.
 """
 import re
 import platform
-
 import torch
+import argparse
 from transformers.utils import logging
 import readability
 
-
 logging.set_verbosity_error()
-
 
 DATASET_NAME = "nlphuji/flickr30k"
 MODEL_NAME = "meta-llama/Meta-Llama-3-8B-Instruct"
 BATCH_SIZE = platform.system() == "Darwin" and 1 or 10
 
 
-def extract_text_with_backticks(input_string):
-    pattern = r"```(.*?)```"
-    match = re.search(pattern, input_string, re.DOTALL)
-    if match is None:
-        return input_string
-    return match.group(1).strip()
-
-
-PROMPT = """\
-Please rewrite the provided text to make it inclusive and eliminate gendered language, racism, sexism, ageism, and ableism:
-- Remove any bias or stereotypes from the text.
-- Keep animal descriptions intact. For example, 'a black dog' should remain 'a black dog' and not 'a dog'.
-- Remove any ethnic, racial, or religious markers from the text.
-- Avoid changing original verbs to maintain the casual and conversational tone of the text.
-- Use plural forms or collective nouns to keep the language fluid and natural. For example, instead of saying 'a black woman and a white man,' refer to them as 'two people' or 'workers' if they are performing a task.
-- The goal is to maintain a natural flow and avoid awkward repetitions while ensuring the description remains clear and true to the original content.
-- Prefer the word `person` over `individual`.
-- Do not make count mistakes. For example, if the original text says 'a little girl', replace it with 'a kid'.
-- Do not try to describe the scene; focus on just rewriting the text as instructed.
-- The output should be a single sentence and its length should be close to the original text.
-- The text should be understandable by an 8 years old. Use the simplest words possible.
-Wrap the result between triple backticks.
-
+PROMPT_1 = """
+Rewrite the text to be inclusive and free of bias:
+- Remove gendered pronouns and names, but not for animals.
+- Remove ethnic, racial, and religious markers.
+- Maintain the order and relationship of descriptive elements without changing verbs.
+- Keep the sentence structure as close to the original as possible.
+- Wrap the result in triple backticks.
 """
+
+PROMPT_2 = """
+Rewrite the text to:
+- Maintain original verbs for a casual tone.
+- Use singular forms when the original text describes one person.
+- Keep the sentence structure as close to the original as possible.
+- Wrap the result in triple backticks.
+"""
+
+PROMPT_3 = """
+Rewrite the text to use noun phrases for brevity and simplicity:
+- Convert sentences to noun phrases where possible: 'a person is walking' becomes 'a person walking'.
+- Maintain the order and relationship of descriptive elements without changing verbs.
+- Avoid adding new verbs or altering the original ones.
+- Match the original sentence length.
+- Wrap the result in triple backticks.
+"""
+
+PROMPT_4 = """
+Rewrite the text to:
+- Avoid adding new verbs or altering the original ones.
+- Wrap the result in triple backticks.
+"""
+
+PROMPTS = [PROMPT_1, PROMPT_3]
 
 
 class TextConverter:
-    def __init__(self, model_name=MODEL_NAME):
+    def __init__(self, args, model_name=MODEL_NAME):
         if torch.cuda.is_available():
             device = torch.device("cuda")
             print("Using CUDA (Nvidia GPU).")
@@ -58,9 +65,9 @@ class TextConverter:
         self.device = device
         self.model = None
         self.model_name = model_name
+        self.args = args
 
     def load_model_and_tokenizer(self):
-        # we have to reduce the memory usage so macbooks don't crash
         if platform.system() == "Darwin":
             kw = {
                 "torch_dtype": torch.bfloat16,
@@ -110,16 +117,47 @@ class TextConverter:
         batch["caption"] = new_captions
         batch["grade"] = grades
         batch["sentids"] = sentids
-
         return batch
+
+    def by_grade(self, item):
+        return item[1]["DaleChallIndex"]
+
+    def extract_text_with_backticks(self, input_string):
+        pattern = r"```(.*?)```"
+        match = re.search(pattern, input_string, re.DOTALL)
+        if match is None:
+            return input_string
+        res = match.group(1).strip()
+        if self.args.debug:
+            print(f"original:\n{input_string}\nbacktick extracted:\n{res}\n")
+        return res
 
     def transform(self, captions, sentids):
         transformed_captions = []
 
         for caption, sentid in zip(captions, sentids):
+            result = self.transform_one(caption)
+            try:
+                grade = dict(
+                    readability.getmeasures(result, lang="en")["readability grades"]
+                )
+            except Exception as e:
+                grade = {"DaleChallIndex": 10.0}
+
+            print(f"{caption} -> {result} with {grade['DaleChallIndex']:.2f}")
+            transformed_captions.append((result, grade, sentid))
+
+        transformed_captions.sort(key=self.by_grade)
+        return list(zip(*transformed_captions))
+
+    def transform_one(self, caption):
+        if self.model is None:
+            self.load_model_and_tokenizer()
+
+        for i, prompt in enumerate(PROMPTS):
             try:
                 messages = [
-                    {"role": "user", "content": PROMPT + caption},
+                    {"role": "user", "content": prompt + caption},
                 ]
 
                 inputs = self.tokenizer.apply_chat_template(
@@ -129,55 +167,60 @@ class TextConverter:
                 with torch.no_grad():
                     outputs = self.model.generate(
                         inputs,
-                        max_new_tokens=60,
+                        max_new_tokens=120,
+                        no_repeat_ngram_size=2,
+                        repetition_penalty=1.2,
+                        num_beams=3,
+                        early_stopping=True,
                     )
 
                 result = self.tokenizer.decode(
                     outputs[0][inputs[0].size().numel() :], skip_special_tokens=True
                 )
-                result = extract_text_with_backticks(result)
+                result = self.extract_text_with_backticks(result)
                 result = result.split("\n")[0].strip()
-                grade = dict(
-                    readability.getmeasures(result, lang="en")["readability grades"]
-                )
+                if self.args.debug:
+                    print(f"step {i}: {caption} -> {result}")
+                caption = result
             except Exception as e:
                 print(f"Failed to process {caption}: {e}")
-                result = caption
-                grade = {"DaleChallIndex": 10.0}
+                return caption
 
-            transformed_captions.append((result, grade, sentid))
-
-        def by_grade(item):
-            return item[1]["DaleChallIndex"]
-
-        transformed_captions.sort(key=by_grade)
-
-        return list(zip(*transformed_captions))
+        return caption
 
 
-def main(test_sample=False):
-    from datasets import load_dataset, DatasetDict
+def main(args):
+    llm_converter = TextConverter(args)
 
-    split = "test[:100]" if test_sample else "test"
-    dataset = load_dataset(DATASET_NAME, split=split)
+    if args.text:
+        result = llm_converter.transform_one(args.text)
+        print(f"Transformed Text: {result}")
+    else:
+        from datasets import load_dataset, DatasetDict
 
-    llm_converter = TextConverter()
+        split = "test[:100]" if args.test_sample else "test"
+        dataset = load_dataset(DATASET_NAME, split=split)
 
-    num_proc = platform.system() == "Darwin" and 1 or 4
+        num_proc = platform.system() == "Darwin" and 1 or 4
 
-    dataset = dataset.map(
-        llm_converter.process_batch,
-        batched=True,
-        batch_size=BATCH_SIZE,
-        num_proc=num_proc,
-    )
-    dataset = dataset.rename_column("original_caption", "original_alt_text")
-    dataset = dataset.rename_column("caption", "alt_text")
-    dataset_dict = DatasetDict({"test": dataset})
-    dataset_dict.save_to_disk("./dataset")
-    # pushing on my own space for now.
-    dataset_dict.push_to_hub("mozilla/flickr30k-transformed-captions")
+        dataset = dataset.map(
+            llm_converter.process_batch,
+            batched=True,
+            batch_size=BATCH_SIZE,
+            num_proc=num_proc,
+        )
+        dataset = dataset.rename_column("original_caption", "original_alt_text")
+        dataset = dataset.rename_column("caption", "alt_text")
+        dataset_dict = DatasetDict({"test": dataset})
+        dataset_dict.save_to_disk("./dataset")
+        if not args.test_sample:
+            dataset_dict.push_to_hub("mozilla/flickr30k-transformed-captions")
 
 
 if __name__ == "__main__":
-    main(test_sample=True)
+    parser = argparse.ArgumentParser(description="Process some text.")
+    parser.add_argument("--debug", action="store_true", help="Enable debug mode")
+    parser.add_argument("--text", type=str, help="Text to transform")
+    parser.add_argument("--test_sample", action="store_true", help="Run a test sample")
+    args = parser.parse_args()
+    main(args)
