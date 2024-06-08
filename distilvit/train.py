@@ -93,11 +93,8 @@ def compute_metrics(tokenizer, rouge, meteor, bleu, eval_preds):
         predictions=decoded_preds, references=decoded_labels
     )["meteor"]
 
-    bleu_result = bleu.compute(predictions=decoded_preds, references=[decoded_labels])[
-        "bleu"
-    ]
-    result["bleu"] = round(bleu_result, 4)
-
+    #bleu_result = bleu.compute(predictions=decoded_preds, references=decoded_labels_list)
+    #result["bleu"] = round(bleu_result["bleu"], 4)
     prediction_lens = [
         np.count_nonzero(pred != tokenizer.pad_token_id) for pred in preds
     ]
@@ -244,8 +241,8 @@ def parse_args():
     )
     parser.add_argument(
         "--dataset",
-        default="all",
-        choices=list(DATASETS.keys()) + ["all"],
+        nargs="+",
+        choices=list(DATASETS.keys()),
         help="Dataset to use for training",
     )
     return parser.parse_args()
@@ -290,25 +287,21 @@ def train(args):
         f"{args.encoder_model.split('/')[-1]}-{args.decoder_model.split('/')[-1]}",
     )
 
-    if args.dataset == "all":
-        datasets = []
-        for get_dataset in DATASETS.values():
-            datasets.append(
-                get_dataset(
-                    args.feature_extractor_model,
-                    args.decoder_model,
-                    cache_dir=args.cache_dir,
-                )
+    datasets = []
+    for name in args.dataset:
+        get_dataset = DATASETS[name]
+        datasets.append(
+            get_dataset(
+                args.feature_extractor_model,
+                args.decoder_model,
+                cache_dir=args.cache_dir,
             )
-        combined = DatasetDict()
-        for split in datasets[0].keys():
-            combined[split] = concatenate_datasets([ds[split] for ds in datasets])
-
-        ds = combined.shuffle(seed=THE_ANSWER_TO_LIFE_THE_UNIVERSE_AND_EVERYTHING)
-    else:
-        ds = DATASETS[args.dataset](
-            args.feature_extractor_model, args.decoder_model, args.cache_dir
         )
+    combined = DatasetDict()
+    for split in datasets[0].keys():
+        combined[split] = concatenate_datasets([ds[split] for ds in datasets])
+
+    ds = combined.shuffle(seed=THE_ANSWER_TO_LIFE_THE_UNIVERSE_AND_EVERYTHING)
 
     os.makedirs(args.checkpoints_dir, exist_ok=True)
 
