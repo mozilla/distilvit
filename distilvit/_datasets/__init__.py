@@ -7,7 +7,7 @@ from .validation import get_dataset as get_validation_dataset
 
 DATASETS = {
     "flickr": get_flickr_dataset,
-    # "coco": get_coco_dataset,
+    "coco": get_coco_dataset,
     "docornot": get_docornot_dataset,
     # "textcaps": get_textcaps_dataset,
     "validation": get_validation_dataset,
