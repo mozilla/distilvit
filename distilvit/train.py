@@ -274,9 +274,16 @@ def train(args):
             )
         else:
             model = VisionEncoderDecoderModel.from_pretrained(args.base_model)
+
+        model_name = f"{args.base_model}+fine-tuned"
+
     else:
         model = VisionEncoderDecoderModel.from_encoder_decoder_pretrained(
             args.encoder_model, args.decoder_model
+        )
+
+        model_name = (
+            f"{args.encoder_model.split('/')[-1]}-{args.decoder_model.split('/')[-1]}"
         )
 
     args.device = torch.device(args.device)
@@ -292,10 +299,7 @@ def train(args):
     model.config.decoder_start_token_id = tokenizer.bos_token_id
     model.config.pad_token_id = tokenizer.pad_token_id
 
-    save_path = os.path.join(
-        args.save_dir,
-        f"{args.encoder_model.split('/')[-1]}-{args.decoder_model.split('/')[-1]}",
-    )
+    save_path = os.path.join(args.save_dir, model_name)
 
     datasets = []
     for name in args.dataset:
