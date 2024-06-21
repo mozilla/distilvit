@@ -1,4 +1,6 @@
 import os
+import sys
+import shutil
 
 os.environ["NCCL_P2P_DISABLE"] = "1"
 os.environ["NCCL_IB_DISABLE"] = "1"
@@ -25,15 +27,9 @@ from datasets import concatenate_datasets, DatasetDict
 from transformers.trainer_callback import EarlyStoppingCallback
 from huggingface_hub import HfApi
 from codecarbon import track_emissions
-from torch.quantization import (
-    QConfig,
-    default_qconfig,
-    prepare_qat,
-    convert,
-    FakeQuantize,
-)
 
 from distilvit._datasets import DATASETS
+from distilvit.quantize import main as quantize
 
 
 def get_device():
@@ -93,8 +89,8 @@ def compute_metrics(tokenizer, rouge, meteor, bleu, eval_preds):
         predictions=decoded_preds, references=decoded_labels
     )["meteor"]
 
-    #bleu_result = bleu.compute(predictions=decoded_preds, references=decoded_labels_list)
-    #result["bleu"] = round(bleu_result["bleu"], 4)
+    # bleu_result = bleu.compute(predictions=decoded_preds, references=decoded_labels_list)
+    # result["bleu"] = round(bleu_result["bleu"], 4)
     prediction_lens = [
         np.count_nonzero(pred != tokenizer.pad_token_id) for pred in preds
     ]
@@ -166,6 +162,20 @@ def parse_args():
     parser = argparse.ArgumentParser(
         description="Train a Vision Encoder Decoder Model",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+    )
+
+    parser.add_argument(
+        "--model-id",
+        default=MODEL_ID,
+        type=str,
+        help="Model ID",
+    )
+
+    parser.add_argument(
+        "--tag",
+        type=str,
+        help="HF tag",
+        default=None,
     )
 
     parser.add_argument(
@@ -319,10 +329,6 @@ def train(args):
         save_steps=args.save_steps,
     )
 
-    if args.push_to_hub:
-        training_args["push_to_hub"] = True
-        training_args["hub_model_id"] = MODEL_ID
-
     training_args = Seq2SeqTrainingArguments(**training_args)
 
     last_checkpoint = get_last_checkpoint(args.checkpoints_dir)
@@ -348,42 +354,44 @@ def train(args):
     else:
         trainer.train()
 
-    # add a Quantization Aware Training step
-    qconfig = QConfig(
-        activation=FakeQuantize.with_args(
-            observer=torch.quantization.MinMaxObserver,
-            quant_min=0,
-            quant_max=255,
-            dtype=torch.quint8,
-        ),
-        weight=FakeQuantize.with_args(
-            observer=torch.quantization.PerChannelMinMaxObserver,
-            quant_min=-128,
-            quant_max=127,
-            dtype=torch.qint8,
-            qscheme=torch.per_channel_symmetric,
-        ),
-    )
-
-    model.qconfig = qconfig
-
-    prepare_qat(model, inplace=True)
-    model.to(args.device)
-
-    trainer.train()
-
     trainer.save_model(save_path)
     tokenizer.save_pretrained(save_path)
+
+    # quantize model
+    q_args = [
+        "quantize",
+        "--model_id",
+        save_path,
+        "--quantize",
+        "--task",
+        "image-to-text-with-past",
+    ]
+    old = sys.argv
+    sys.argv = q_args
+    try:
+        quantize()
+    finally:
+        sys.argv = old
+
+    shutil.copyfile(MODEL_CARD, os.path.join(save_path, "README.md"))
+
     print(f"Model saved to {save_path}")
 
-    # pushing model card. XXX add dynamic info by reading from codecarbon.csv
-    api = HfApi()
-    api.upload_file(
-        path_or_fileobj=MODEL_CARD,
-        path_in_repo="README.md",
-        repo_id="mozilla/distilvit",
-        repo_type="model",
-    )
+    if args.push_to_hub:
+        api = HfApi()
+
+        # pushing the whole dir
+        api.upload_folder(
+            repo_id=args.model_id,
+            folder_path=save_path,
+            commit_message=f"New training",
+        )
+
+        if args.tag:
+            api.create_tag(
+                repo_id=args.model_id,
+                tag=args.tag,
+            )
 
 
 def main():

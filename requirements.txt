@@ -5,9 +5,9 @@ bitsandbytes
 accelerate
 pandas
 datasets
-transformers
+transformers[torch]==4.33.2
 accelerate
-numpy
+numpy<2.0
 evaluate
 scikit-learn
 tqdm
@@ -19,3 +19,9 @@ rouge-score
 absl-py
 codecarbon
 setuptools
+
+# for the converter
+transformers[torch]
+onnxruntime==1.15.1
+optimum==1.13.2
+onnx==1.13.1
