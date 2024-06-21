@@ -3,7 +3,7 @@ import functools
 
 from transformers import (
     AutoTokenizer,
-    AutoFeatureExtractor,
+    AutoImageProcessor,
 )
 
 
@@ -52,7 +52,7 @@ class DatasetTokenizer:
         image_preprocessor_cls=ImagePreprocessor,
         logfile="replacements.csv",
     ):
-        self.feature_extractor = AutoFeatureExtractor.from_pretrained(
+        self.feature_extractor = AutoImageProcessor.from_pretrained(
             feature_extractor_model
         )
         self.tokenizer = AutoTokenizer.from_pretrained(text_decoder_model)
