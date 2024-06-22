@@ -25,11 +25,11 @@ from transformers import (
 from transformers.trainer_utils import get_last_checkpoint
 from datasets import concatenate_datasets, DatasetDict
 from transformers.trainer_callback import EarlyStoppingCallback
-from huggingface_hub import HfApi
 from codecarbon import track_emissions
 
 from distilvit._datasets import DATASETS
 from distilvit.quantize import main as quantize
+from distilvit.upload import push_to_hub
 
 
 def get_device():
@@ -382,20 +382,7 @@ def train(args):
     print(f"Model saved to {save_path}")
 
     if args.push_to_hub:
-        api = HfApi()
-
-        # pushing the whole dir
-        api.upload_folder(
-            repo_id=args.model_id,
-            folder_path=save_path,
-            commit_message=f"New training",
-        )
-
-        if args.tag:
-            api.create_tag(
-                repo_id=args.model_id,
-                tag=args.tag,
-            )
+        push_to_hub(args.model_id, save_path, args.tag, "New training")
 
 
 def main():

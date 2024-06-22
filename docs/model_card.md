@@ -6,7 +6,7 @@ license: apache-2.0
 metrics:
   - rouge
 datasets:
-  - nlphuji/flickr30k
+  - Mozilla/flickr30k-transformed-captions
 widget:
   - src: https://huggingface.co/datasets/mishig/sample_images/resolve/main/savanna.jpg
     example_title: Savanna
