@@ -7,7 +7,7 @@ from distilvit.utils import DatasetTokenizer, cached_ds
 
 
 @cached_ds("textcaps")
-def get_dataset(feature_extractor_model, text_decoder_model):
+def get_dataset(feature_extractor_model, text_decoder_model, args):
     ds = load_dataset("lmms-lab/TextCaps", split="train")
 
     ds_tokenizer = DatasetTokenizer(

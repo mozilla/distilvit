@@ -308,7 +308,7 @@ def train(args):
             get_dataset(
                 args.feature_extractor_model,
                 args.decoder_model,
-                cache_dir=args.cache_dir,
+                args=args,
             )
         )
     combined = DatasetDict()

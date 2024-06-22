@@ -47,8 +47,6 @@ urls = [
     "http://images.cocodataset.org/annotations/image_info_test2017.zip",
 ]
 
-COCO_DIR = os.path.join(os.path.dirname(__file__), "..", "..", "coco")
-
 
 class CocoImagePreprocessor(ImagePreprocessor):
     def __init__(
@@ -78,15 +76,16 @@ class CocoImagePreprocessor(ImagePreprocessor):
 
 
 @cached_ds("coco")
-def get_dataset(feature_extractor_model, text_decoder_model):
+def get_dataset(feature_extractor_model, text_decoder_model, args):
     """Downloads the COCO dataset and tokenizes it.
 
     The result is saved on disk so we can reuse it.
     """
+    cache_dir = os.path.join(args.cache_dir, "coco")
 
     for url in urls:
         print(f"Downloading {url}...")
-        download_file(url, COCO_DIR)
+        download_file(url, cache_dir)
     print("Download complete.")
 
     from datasets import load_dataset
@@ -94,7 +93,7 @@ def get_dataset(feature_extractor_model, text_decoder_model):
     ds = load_dataset(
         "ydshieh/coco_dataset_script",
         "2017",
-        data_dir=COCO_DIR,
+        data_dir=cache_dir,
         trust_remote_code=True,
     )
 

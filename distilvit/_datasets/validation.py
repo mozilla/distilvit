@@ -6,7 +6,7 @@ from distilvit.utils import DatasetTokenizer, cached_ds
 
 
 @cached_ds("validation")
-def get_dataset(feature_extractor_model, text_decoder_model):
+def get_dataset(feature_extractor_model, text_decoder_model, args):
     from datasets import load_dataset
 
     ds = load_dataset("Mozilla/alt-text-validation", split="train")
