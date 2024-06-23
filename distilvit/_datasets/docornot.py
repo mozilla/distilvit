@@ -9,7 +9,8 @@ from distilvit.utils import DatasetTokenizer, cached_ds
 def get_dataset(feature_extractor_model, text_decoder_model, args):
     from datasets import load_dataset
 
-    ds = load_dataset("mozilla/docornot", split="train[:2000]")
+    sample = args.sample if args.sample else 2000
+    ds = load_dataset("mozilla/docornot", split=f"train[:{sample}]")
 
     # we're only interested in documents and provide a fixed caption.
     ds = ds.filter(lambda example: example["is_document"] == 1)

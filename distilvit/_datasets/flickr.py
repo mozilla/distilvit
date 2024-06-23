@@ -9,7 +9,8 @@ from distilvit.utils import DatasetTokenizer, cached_ds
 def get_dataset(feature_extractor_model, text_decoder_model, args):
     from datasets import load_dataset
 
-    ds = load_dataset("Mozilla/flickr30k-transformed-captions", split="test")
+    split = f"test[:{args.sample}]" if args.sample else "test"
+    ds = load_dataset("Mozilla/flickr30k-transformed-captions", split=split)
 
     ds_tokenizer = DatasetTokenizer(
         feature_extractor_model,

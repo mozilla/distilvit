@@ -31,7 +31,7 @@ def main(before, after):
             pipeline(
                 "image-to-text",
                 model=after,
-                #revision="main",
+                # revision="main",
             ),
         ),
     ]

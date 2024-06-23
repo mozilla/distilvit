@@ -18,7 +18,7 @@ from transformers import (
     Seq2SeqTrainer,
     Seq2SeqTrainingArguments,
     VisionEncoderDecoderModel,
-    AutoFeatureExtractor,
+    AutoImageProcessor,
     AutoTokenizer,
     TrainerCallback,
 )
@@ -73,7 +73,7 @@ def postprocess_text(preds, labels):
     return preds, labels
 
 
-def compute_metrics(tokenizer, rouge, meteor, bleu, eval_preds):
+def compute_metrics(tokenizer, rouge, meteor, bleu, eval_preds, args=None):
     preds, labels = eval_preds
     if isinstance(preds, tuple):
         preds = preds[0]
@@ -81,6 +81,11 @@ def compute_metrics(tokenizer, rouge, meteor, bleu, eval_preds):
     labels = np.where(labels != -100, labels, tokenizer.pad_token_id)
     decoded_labels = tokenizer.batch_decode(labels, skip_special_tokens=True)
     decoded_preds, decoded_labels = postprocess_text(decoded_preds, decoded_labels)
+
+    if args.debug:
+        for expected, res in zip(decoded_labels, decoded_preds):
+            print(f"Expected: {expected}, got: {res}")
+
     result = rouge.compute(
         predictions=decoded_preds, references=decoded_labels, use_stemmer=True
     )
@@ -172,6 +177,13 @@ def parse_args():
     )
 
     parser.add_argument(
+        "--sample",
+        default=None,
+        type=int,
+        help="Sample data",
+    )
+
+    parser.add_argument(
         "--tag",
         type=str,
         help="HF tag",
@@ -197,6 +209,13 @@ def parse_args():
         default=os.path.join(ROOT_DIR, "checkpoints"),
         type=str,
         help="Checkpoints dir",
+    )
+
+    parser.add_argument(
+        "--debug",
+        default=False,
+        action="store_true",
+        help="Debug mode",
     )
 
     parser.add_argument(
@@ -264,9 +283,7 @@ def train(args):
     meteor = evaluate.load("meteor")
     bleu = evaluate.load("bleu")
 
-    feature_extractor = AutoFeatureExtractor.from_pretrained(
-        args.feature_extractor_model
-    )
+    feature_extractor = AutoImageProcessor.from_pretrained(args.feature_extractor_model)
     if args.base_model:
         if args.base_model_revision:
             model = VisionEncoderDecoderModel.from_pretrained(
@@ -344,7 +361,9 @@ def train(args):
         model=model,
         tokenizer=feature_extractor,
         args=training_args,
-        compute_metrics=partial(compute_metrics, tokenizer, rouge, meteor, bleu),
+        compute_metrics=partial(
+            compute_metrics, tokenizer, rouge, meteor, bleu, args=args
+        ),
         train_dataset=ds["train"],
         eval_dataset=ds["validation"],
         data_collator=partial(data_collator, tokenizer),
