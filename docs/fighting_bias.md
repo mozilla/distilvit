@@ -85,7 +85,7 @@ Two people using laptops at a table in a cozy cafe.
 
 Another example:
 
-![A person eating from a small bowl with a spoon, looking thoughtful.](ttps://huggingface.co/datasets/Mozilla/flickr30k-transformed-captions-gpt4o/resolve/main/example2.jpg)
+![A person eating from a small bowl with a spoon, looking thoughtful.](https://huggingface.co/datasets/Mozilla/flickr30k-transformed-captions-gpt4o/resolve/main/example2.jpg)
 
 Human provided:
 
