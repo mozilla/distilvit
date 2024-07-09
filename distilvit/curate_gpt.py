@@ -1,11 +1,13 @@
 import json
 import os
 import time
-from openai import OpenAI
 import base64
-from datasets import load_dataset, DatasetDict
-from io import BytesIO
+import argparse
 import sqlite3
+from io import BytesIO
+
+from openai import OpenAI
+from datasets import load_dataset, DatasetDict, Dataset
 
 
 api_key = os.environ["OPENAI_API_KEY"]
@@ -13,6 +15,58 @@ client = OpenAI(api_key=api_key)
 
 
 DB_PATH = "alt_text_cache.db"
+
+
+def parse_args():
+    parser = argparse.ArgumentParser(
+        description="Generate alternative text for images in a dataset.",
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+    )
+    parser.add_argument(
+        "--sample",
+        type=int,
+        default=None,
+        help="Run on a sample",
+    )
+    parser.add_argument(
+        "--dataset",
+        type=str,
+        default="nlphuji/flickr30k",
+        help="Name of the dataset to use",
+    )
+    parser.add_argument(
+        "--target-dataset",
+        type=str,
+        default="mozilla/flickr30k-transformed-captions-gpt4o",
+        help="Name of the target dataset to save to",
+    )
+    parser.add_argument(
+        "--dataset-split",
+        type=str,
+        default="test",
+        help="Name of the dataset split",
+    )
+
+    parser.add_argument(
+        "--image-column",
+        type=str,
+        default="image",
+        help="Name of the image column in the dataset",
+    )
+    parser.add_argument(
+        "--generated-alt-text-column",
+        type=str,
+        default="alt_text",
+        help="Name of the resulting alt text column",
+    )
+    parser.add_argument(
+        "--image-id-column",
+        type=str,
+        default="img_id",
+        help="Name of the image id column in the dataset",
+    )
+
+    return parser.parse_args()
 
 
 class CacheDB:
@@ -74,12 +128,11 @@ Guidelines:
 - The JSON key to use is "alt_text" and is the list of alt texts.
 """
 
-DATASET_NAME = "nlphuji/flickr30k"
-
 
 class AltGenerator:
-    def __init__(self):
+    def __init__(self, args):
         self.db = CacheDB()
+        self.args = args
 
     def image_message(self, image):
         buffered = BytesIO()
@@ -131,14 +184,14 @@ class AltGenerator:
                 time.sleep(1)
 
     def __call__(self, batch):
-        batch["original_caption"] = list(batch["caption"])
-        img_ids = [str(img_id) for img_id in batch["img_id"]]
+        # batch["original_caption"] = list(batch["caption"])
+        img_ids = [str(img_id) for img_id in batch[self.args.image_id_column]]
 
         # Check cache
         cached_alt_texts = self.db.get(img_ids)
         new_images = [
             image
-            for img_id, image in zip(img_ids, batch["image"])
+            for img_id, image in zip(img_ids, batch[self.args.image_column])
             if img_id not in cached_alt_texts
         ]
         new_img_ids = [img_id for img_id in img_ids if img_id not in cached_alt_texts]
@@ -152,15 +205,17 @@ class AltGenerator:
         for img_id in img_ids:
             caps.append(cached_alt_texts[img_id])
 
-        batch["caption"] = caps
+        batch[self.args.generated_alt_text_column] = caps
         return batch
 
 
 if __name__ == "__main__":
-    generator = AltGenerator()
+    args = parse_args()
+    generator = AltGenerator(args)
+    dataset = load_dataset(args.dataset, split=args.dataset_split)
 
-    split = "test"
-    dataset = load_dataset(DATASET_NAME, split=split)
+    if args.sample is not None:
+        dataset = Dataset.from_dict(dataset[: args.sample])
 
     dataset = dataset.map(
         generator,
@@ -168,8 +223,8 @@ if __name__ == "__main__":
         batch_size=BATCH_SIZE,
     )
 
-    dataset = dataset.rename_column("original_caption", "original_alt_text")
-    dataset = dataset.rename_column("caption", "alt_text")
-    dataset_dict = DatasetDict({"test": dataset})
+    # dataset = dataset.rename_column("original_caption", "original_alt_text")
+    # dataset = dataset.rename_column("caption", "alt_text")
+    dataset_dict = DatasetDict({args.dataset_split: dataset})
     dataset_dict.save_to_disk("./dataset")
-    dataset_dict.push_to_hub("mozilla/flickr30k-transformed-captions-gpt4o")
+    dataset_dict.push_to_hub(args.target_dataset)
