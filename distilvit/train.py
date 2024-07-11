@@ -2,9 +2,12 @@ import os
 import sys
 import shutil
 
+
 os.environ["NCCL_P2P_DISABLE"] = "1"
 os.environ["NCCL_IB_DISABLE"] = "1"
 os.environ["PYTORCH_ENABLE_MPS_FALLBACK"] = "1"
+os.environ["WANDB_PROJECT"] = "mozilla/distilvit"
+os.environ["WANDB_LOG_MODEL"] = "false"
 
 from functools import partial
 import torch
@@ -344,10 +347,12 @@ def train(args):
         per_device_eval_batch_size=50,
         num_train_epochs=args.num_train_epochs,
         output_dir=args.checkpoints_dir,
+        metric_for_best_model="eval_loss",
         save_total_limit=10,
         load_best_model_at_end=True,
         eval_steps=args.eval_steps,
         save_steps=args.save_steps,
+        report_to="wandb",
     )
 
     training_args = Seq2SeqTrainingArguments(**training_args)
@@ -372,11 +377,11 @@ def train(args):
             metrics_logger_callback,
         ],
     )
+
     if last_checkpoint is not None:
         trainer.train(resume_from_checkpoint=last_checkpoint)
     else:
         trainer.train()
-
     trainer.save_model(save_path)
     tokenizer.save_pretrained(save_path)
 
@@ -405,7 +410,8 @@ def train(args):
 
 
 def main():
-    train(parse_args())
+    args = parse_args()
+    train(args)
 
 
 if __name__ == "__main__":

@@ -19,6 +19,7 @@ rouge-score
 absl-py
 codecarbon
 setuptools
+wandb
 
 # for the converter
 transformers[torch]
