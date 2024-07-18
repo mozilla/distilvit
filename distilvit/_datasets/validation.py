@@ -13,12 +13,14 @@ def get_dataset(feature_extractor_model, text_decoder_model, args):
 
     # keeping only the images with non-empty gpt_alt_text
     ds = ds.filter(lambda x: x["gpt_alt_text"] and x["gpt_alt_text"].strip() != "")
-    ds = ds.map(lambda x: {"gpt_alt_text": [x["gpt_alt_text"]]})
+
+    # copy over the alt_text
+    ds = ds.map(lambda x: {"alt_text": [x["gpt_alt_text"]]})
 
     ds_tokenizer = DatasetTokenizer(
         feature_extractor_model,
         text_decoder_model,
-        caption_column="gpt_alt_text",
+        caption_column="alt_text",
     )
 
     ds = ds_tokenizer("validation", ds)
