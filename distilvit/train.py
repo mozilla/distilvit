@@ -6,7 +6,7 @@ import shutil
 os.environ["NCCL_P2P_DISABLE"] = "1"
 os.environ["NCCL_IB_DISABLE"] = "1"
 os.environ["PYTORCH_ENABLE_MPS_FALLBACK"] = "1"
-os.environ["WANDB_PROJECT"] = "mozilla/distilvit"
+os.environ["WANDB_PROJECT"] = "distilvit"
 os.environ["WANDB_LOG_MODEL"] = "false"
 
 from functools import partial
@@ -76,7 +76,14 @@ def postprocess_text(preds, labels):
     return preds, labels
 
 
-def compute_metrics(tokenizer, rouge, meteor, bleu, eval_preds, args=None):
+def compute_metrics(
+    tokenizer,
+    rouge,
+    meteor,
+    cider,
+    eval_preds,
+    args=None,
+):
     preds, labels = eval_preds
     if isinstance(preds, tuple):
         preds = preds[0]
@@ -97,13 +104,27 @@ def compute_metrics(tokenizer, rouge, meteor, bleu, eval_preds, args=None):
         predictions=decoded_preds, references=decoded_labels
     )["meteor"]
 
-    # bleu_result = bleu.compute(predictions=decoded_preds, references=decoded_labels_list)
-    # result["bleu"] = round(bleu_result["bleu"], 4)
     prediction_lens = [
         np.count_nonzero(pred != tokenizer.pad_token_id) for pred in preds
     ]
     result["gen_len"] = np.mean(prediction_lens)
+    result["cider"] = cider.compute(
+        predictions=decoded_preds, references=decoded_labels
+    )["cider"]
+
     return result
+
+
+def freeze_model_layers(model, freeze_encoder_layers=3, freeze_decoder_layers=3):
+    for i, layer in enumerate(model.encoder.encoder.layer):
+        if i < freeze_encoder_layers:
+            for param in layer.parameters():
+                param.requires_grad = False
+
+    for i, layer in enumerate(model.decoder.transformer.h):
+        if i < freeze_decoder_layers:
+            for param in layer.parameters():
+                param.requires_grad = False
 
 
 def data_collator(tokenizer, features):
@@ -208,6 +229,13 @@ def parse_args():
     )
 
     parser.add_argument(
+        "--prune-cache",
+        default=False,
+        action="store_true",
+        help="Empty cache dir",
+    )
+
+    parser.add_argument(
         "--checkpoints-dir",
         default=os.path.join(ROOT_DIR, "checkpoints"),
         type=str,
@@ -284,7 +312,6 @@ def parse_args():
 def train(args):
     rouge = evaluate.load("rouge")
     meteor = evaluate.load("meteor")
-    bleu = evaluate.load("bleu")
 
     feature_extractor = AutoImageProcessor.from_pretrained(args.feature_extractor_model)
     if args.base_model:
@@ -306,6 +333,8 @@ def train(args):
             f"{args.encoder_model.split('/')[-1]}-{args.decoder_model.split('/')[-1]}"
         )
 
+    freeze_model_layers(model, freeze_encoder_layers=3, freeze_decoder_layers=3)
+
     args.device = torch.device(args.device)
     print("Using device", args.device)
     model.to(args.device)
@@ -321,6 +350,7 @@ def train(args):
 
     save_path = os.path.join(args.save_dir, model_name)
 
+    print("Sources", args.dataset)
     datasets = []
     for name in args.dataset:
         get_dataset = DATASETS[name]
@@ -331,12 +361,15 @@ def train(args):
                 args=args,
             )
         )
+
+    print("Datasets loaded", datasets)
     combined = DatasetDict()
     for split in datasets[0].keys():
         combined[split] = concatenate_datasets([ds[split] for ds in datasets])
 
     ds = combined.shuffle(seed=THE_ANSWER_TO_LIFE_THE_UNIVERSE_AND_EVERYTHING)
 
+    print("Datasets combined and shuffled", ds)
     os.makedirs(args.checkpoints_dir, exist_ok=True)
 
     training_args = dict(
@@ -347,13 +380,16 @@ def train(args):
         per_device_eval_batch_size=50,
         num_train_epochs=args.num_train_epochs,
         output_dir=args.checkpoints_dir,
-        metric_for_best_model="eval_loss",
+        metric_for_best_model="eval_rougeL",
         save_total_limit=10,
         load_best_model_at_end=True,
         eval_steps=args.eval_steps,
         save_steps=args.save_steps,
         report_to="wandb",
     )
+
+    if args.base_model:
+        training_args["generation_config"] = args.model_id
 
     training_args = Seq2SeqTrainingArguments(**training_args)
 
@@ -366,11 +402,17 @@ def train(args):
         model=model,
         tokenizer=feature_extractor,
         args=training_args,
-        compute_metrics=partial(
-            compute_metrics, tokenizer, rouge, meteor, bleu, args=args
+        compute_metrics=lambda eval_preds: compute_metrics(
+            tokenizer,
+            rouge,
+            meteor,
+            eval_preds,
+            args=args,
         ),
         train_dataset=ds["train"],
         eval_dataset=ds["validation"],
+        num_beams=2,
+        max_length=50,
         data_collator=partial(data_collator, tokenizer),
         callbacks=[
             EarlyStoppingCallback(early_stopping_patience=3),

@@ -11,16 +11,14 @@ def get_dataset(feature_extractor_model, text_decoder_model, args):
 
     ds = load_dataset("Mozilla/alt-text-validation", split="train")
 
-    # keeping only the images with non-empty inclusive_alt_text
-    ds = ds.filter(
-        lambda x: x["inclusive_alt_text"] and x["inclusive_alt_text"].strip() != ""
-    )
-    ds = ds.map(lambda x: {"inclusive_alt_text": [x["inclusive_alt_text"]]})
+    # keeping only the images with non-empty gpt_alt_text
+    ds = ds.filter(lambda x: x["gpt_alt_text"] and x["gpt_alt_text"].strip() != "")
+    ds = ds.map(lambda x: {"gpt_alt_text": [x["gpt_alt_text"]]})
 
     ds_tokenizer = DatasetTokenizer(
         feature_extractor_model,
         text_decoder_model,
-        caption_column="inclusive_alt_text",
+        caption_column="gpt_alt_text",
     )
 
     ds = ds_tokenizer("validation", ds)

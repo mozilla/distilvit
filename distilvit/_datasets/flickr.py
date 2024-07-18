@@ -10,7 +10,9 @@ def get_dataset(feature_extractor_model, text_decoder_model, args):
     from datasets import load_dataset
 
     split = f"test[:{args.sample}]" if args.sample else "test"
-    ds = load_dataset("Mozilla/flickr30k-transformed-captions", split=split)
+    ds = load_dataset("Mozilla/flickr30k-transformed-captions-gpt4o", split=split)
+    # make alt_text a list
+    ds = ds.map(lambda ex: {"alt_text": [ex["alt_text"]]})
 
     ds_tokenizer = DatasetTokenizer(
         feature_extractor_model,

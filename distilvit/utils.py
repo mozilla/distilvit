@@ -1,5 +1,6 @@
 import os
 import functools
+import shutil
 
 from transformers import (
     AutoTokenizer,
@@ -84,19 +85,26 @@ def cached_ds(cache_name):
     def _cached_ds(func):
         @functools.wraps(func)
         def wrapper(*args, **kwargs):
-            if len(args) == 3:
-                cache_dir = args[-1]
-                args = args[:-1]
+            if "args" in kwargs:
+                cache_dir = kwargs["args"].cache_dir
+                prune_cache = kwargs["args"].prune_cache
             else:
-                cache_dir = kwargs.pop("cache_dir", ".cache")
+                cache_dir = ".cache"
+                prune_cache = False
 
             cached_ds = os.path.join(cache_dir, cache_name)
+
             if not os.path.exists(cache_dir):
                 os.makedirs(cache_dir)
             elif os.path.exists(cached_ds):
-                from datasets import load_from_disk
+                if prune_cache:
+                    print("Pruning cache...")
+                    shutil.rmtree(cached_ds)
 
-                return load_from_disk(cached_ds)
+                else:
+                    from datasets import load_from_disk
+
+                    return load_from_disk(cached_ds)
 
             ds = func(*args, **kwargs)
             ds.save_to_disk(cached_ds)
