@@ -80,7 +80,6 @@ def compute_metrics(
     tokenizer,
     rouge,
     meteor,
-    cider,
     eval_preds,
     args=None,
 ):
@@ -108,9 +107,6 @@ def compute_metrics(
         np.count_nonzero(pred != tokenizer.pad_token_id) for pred in preds
     ]
     result["gen_len"] = np.mean(prediction_lens)
-    result["cider"] = cider.compute(
-        predictions=decoded_preds, references=decoded_labels
-    )["cider"]
 
     return result
 
@@ -288,8 +284,8 @@ def parse_args():
 
     parser.add_argument(
         "--feature-extractor-model",
-        # default="google/vit-base-patch16-224-in21k",
-        default="google/vit-base-patch16-224",
+        default="google/vit-base-patch16-224-in21k",
+        #default="google/vit-base-patch16-224",
         type=str,
         help="Feature extractor model for the encoder",
     )
@@ -333,7 +329,7 @@ def train(args):
             f"{args.encoder_model.split('/')[-1]}-{args.decoder_model.split('/')[-1]}"
         )
 
-    freeze_model_layers(model, freeze_encoder_layers=3, freeze_decoder_layers=3)
+    #freeze_model_layers(model, freeze_encoder_layers=3, freeze_decoder_layers=3)
 
     args.device = torch.device(args.device)
     print("Using device", args.device)
@@ -386,6 +382,8 @@ def train(args):
         eval_steps=args.eval_steps,
         save_steps=args.save_steps,
         report_to="wandb",
+        generation_num_beams=2,
+        generation_max_length=50
     )
 
     if args.base_model:
@@ -402,17 +400,14 @@ def train(args):
         model=model,
         tokenizer=feature_extractor,
         args=training_args,
-        compute_metrics=lambda eval_preds: compute_metrics(
+        compute_metrics=partial(compute_metrics,
             tokenizer,
             rouge,
             meteor,
-            eval_preds,
             args=args,
         ),
         train_dataset=ds["train"],
         eval_dataset=ds["validation"],
-        num_beams=2,
-        max_length=50,
         data_collator=partial(data_collator, tokenizer),
         callbacks=[
             EarlyStoppingCallback(early_stopping_patience=3),
