@@ -31,6 +31,13 @@ def parse_args():
         help="Run on a sample",
     )
     parser.add_argument(
+        "--data-dir",
+        type=str,
+        default="./dummy_data",
+        help="Dataset dir",
+    )
+
+    parser.add_argument(
         "--dataset",
         type=str,
         default="nlphuji/flickr30k",
@@ -234,7 +241,9 @@ def image_loader(batch, image_column_name="image"):
 def drop_duplicates_in_split(split):
     df = pd.DataFrame(split)
     df_selected = (
-        df[["image_id", "image_path"]].drop_duplicates().reset_index(drop=True)
+        df[["image_id", "image_path", "coco_url"]]
+        .drop_duplicates()
+        .reset_index(drop=True)
     )
     return Dataset.from_pandas(df_selected)
 
@@ -245,7 +254,7 @@ if __name__ == "__main__":
 
     if args.dataset == "coco":
         dataset = load_dataset(
-            "ydshieh/coco_dataset_script", "2017", data_dir="./dummy_data/"
+            "ydshieh/coco_dataset_script", "2017", data_dir=args.data_dir
         )
 
         train_unique = drop_duplicates_in_split(dataset["train"])
