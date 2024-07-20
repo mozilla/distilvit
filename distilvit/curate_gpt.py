@@ -5,7 +5,9 @@ import base64
 import argparse
 import sqlite3
 from io import BytesIO
+import pandas as pd
 
+from PIL import Image
 from openai import OpenAI
 from datasets import load_dataset, DatasetDict, Dataset
 
@@ -78,20 +80,21 @@ class CacheDB:
             """
             CREATE TABLE IF NOT EXISTS alt_text_cache (
                 img_id TEXT PRIMARY KEY,
-                alt_text TEXT
+                alt_text TEXT,
+                objects TEXT
             )
         """
         )
         conn.commit()
         conn.close()
 
-    def save(self, img_ids, alt_texts):
+    def save(self, img_ids, data):
         conn = sqlite3.connect(self.path)
         c = conn.cursor()
-        for img_id, alt_text in zip(img_ids, alt_texts):
+        for img_id, img_data in zip(img_ids, data):
             c.execute(
-                "REPLACE INTO alt_text_cache (img_id, alt_text) VALUES (?, ?)",
-                (img_id, alt_text),
+                "REPLACE INTO alt_text_cache (img_id, alt_text, objects) VALUES (?, ?, ?)",
+                (img_id, img_data["alt_text"], ",".join(img_data["objects"])),
             )
         conn.commit()
         conn.close()
@@ -100,32 +103,35 @@ class CacheDB:
         conn = sqlite3.connect(self.path)
         c = conn.cursor()
         c.execute(
-            "SELECT img_id, alt_text FROM alt_text_cache WHERE img_id IN ({})".format(
+            "SELECT img_id, alt_text, objects FROM alt_text_cache WHERE img_id IN ({})".format(
                 ",".join("?" for _ in img_ids)
             ),
             img_ids,
         )
         results = c.fetchall()
         conn.close()
-        return {img_id: alt_text for img_id, alt_text in results}
+        return {
+            img_id: {"alt_text": alt_text, "objects": objects.split(",")}
+            for img_id, alt_text, objects in results
+        }
 
 
 BATCH_SIZE = 5
 PROMPT = f"""\
-Look at the {BATCH_SIZE} images and create an alternative text for each.
+Look at the {BATCH_SIZE} images and create an alternative text and list of detected objects for each.
 You will make it inclusive and eliminate gendered language, racism, sexism, ageism, and ableism.
 
 Guidelines:
-- No bias or stereotypes from the text.
-- Use noun phrases.
-- Remove any ethnic, racial, or religious markers from the text
-- If there's a mention of a girl or boy replace it with 'child' or 'kid', same for man or woman so we don't misgender people.
+- No bias or stereotypes
+- Use noun phrases
+- No ethnic, racial, or religious markers
+- If there's a girl or boy, use 'child' or 'kid', same for `man` or `woman` so we don't misgender people.
 - The output should be a single sentence.
-- Use a casual and conversational tone of the text.
+- Use a casual and conversational tone.
 - Prefer the word 'person' over 'individual'.
 - The text should be understandable by an 8 years old. Use the simplest words possible.
 - Try not to lose details of important elements, but keep it as concise as possible.
-- The JSON key to use is "alt_text" and is the list of alt texts.
+- The JSON returned is an list of `alt_text` and `objects`
 """
 
 
@@ -173,8 +179,7 @@ class AltGenerator:
                     messages=messages,
                     temperature=0.0,
                 )
-
-                return json.loads(response.choices[0].message.content)["alt_text"]
+                return json.loads(response.choices[0].message.content)
             except Exception as e:
                 print(f"Failed on attempt {i+1}/3")
                 print(images)
@@ -186,7 +191,6 @@ class AltGenerator:
     def __call__(self, batch):
         # batch["original_caption"] = list(batch["caption"])
         img_ids = [str(img_id) for img_id in batch[self.args.image_id_column]]
-
         # Check cache
         cached_alt_texts = self.db.get(img_ids)
         new_images = [
@@ -197,22 +201,67 @@ class AltGenerator:
         new_img_ids = [img_id for img_id in img_ids if img_id not in cached_alt_texts]
 
         if new_images:
-            new_alt_texts = self.generate(new_images, new_img_ids)
-            self.db.save(new_img_ids, new_alt_texts)
-            cached_alt_texts.update(dict(zip(new_img_ids, new_alt_texts)))
+            import pdb
 
-        caps = []
-        for img_id in img_ids:
-            caps.append(cached_alt_texts[img_id])
+            pdb.set_trace()
 
-        batch[self.args.generated_alt_text_column] = caps
+            generation = self.generate(new_images, new_img_ids)
+            if "images" not in generation:
+                generation = {"images": [generation]}
+
+            self.db.save(new_img_ids, generation["images"])
+            cached_alt_texts.update(dict(zip(new_img_ids, generation["images"])))
+
+        batch[self.args.generated_alt_text_column] = [
+            cached_alt_texts[img_id]["alt_text"] for img_id in img_ids
+        ]
+        batch["objects"] = [cached_alt_texts[img_id]["objects"] for img_id in img_ids]
         return batch
+
+
+def image_loader(batch, image_column_name="image"):
+    images = []
+    for image_path in batch["image_path"]:
+        try:
+            images.append(Image.open(image_path).convert("RGB"))
+        except Exception:
+            pass
+    batch[image_column_name] = images
+    del batch["image_path"]
+    return batch
+
+
+def drop_duplicates_in_split(split):
+    df = pd.DataFrame(split)
+    df_selected = (
+        df[["image_id", "image_path"]].drop_duplicates().reset_index(drop=True)
+    )
+    return Dataset.from_pandas(df_selected)
 
 
 if __name__ == "__main__":
     args = parse_args()
     generator = AltGenerator(args)
-    dataset = load_dataset(args.dataset, split=args.dataset_split)
+
+    if args.dataset == "coco":
+        dataset = load_dataset(
+            "ydshieh/coco_dataset_script", "2017", data_dir="./dummy_data/"
+        )
+
+        train_unique = drop_duplicates_in_split(dataset["train"])
+        test_unique = drop_duplicates_in_split(dataset["test"])
+        validation_unique = drop_duplicates_in_split(dataset["validation"])
+
+        dataset = DatasetDict(
+            {
+                "train": train_unique,
+                "test": test_unique,
+                "validation": validation_unique,
+            }
+        )
+        dataset = dataset.map(image_loader, batched=True, batch_size=BATCH_SIZE)
+    else:
+        dataset = load_dataset(args.dataset, split=args.dataset_split)
 
     if args.sample is not None:
         dataset = Dataset.from_dict(dataset[: args.sample])
@@ -225,6 +274,11 @@ if __name__ == "__main__":
 
     # dataset = dataset.rename_column("original_caption", "original_alt_text")
     # dataset = dataset.rename_column("caption", "alt_text")
-    dataset_dict = DatasetDict({args.dataset_split: dataset})
+
+    if args.dataset != "coco":
+        dataset_dict = DatasetDict({args.dataset_split: dataset})
+    else:
+        dataset_dict = dataset
+
     dataset_dict.save_to_disk("./dataset")
     dataset_dict.push_to_hub(args.target_dataset)
