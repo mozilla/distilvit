@@ -20,6 +20,7 @@ absl-py
 codecarbon
 setuptools
 wandb
+mysql-connector-python
 
 # for the converter
 onnxruntime==1.15.1
