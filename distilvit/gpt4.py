@@ -5,6 +5,7 @@ from PIL import Image
 from openai import OpenAI
 import os
 from io import BytesIO
+import time
 
 api_key = os.environ["OPENAI_API_KEY"]
 client = OpenAI(api_key=api_key)
@@ -13,16 +14,21 @@ client = OpenAI(api_key=api_key)
 BATCH_SIZE = 5
 PROMPT = f"""\
 Look at the {BATCH_SIZE} images and create an alternative text and list of detected objects for each.
+The produced text is used to train a small image-to-text language model.
 You will make it inclusive and eliminate gendered language, racism, sexism, ageism, and ableism.
 
 Guidelines:
 - No bias or stereotypes
 - Use noun phrases
-- No ethnic, racial, or religious markers
-- If there's a girl or boy, use 'child' or 'kid', same for `man` or `woman` so we don't misgender people.
 - The output should be a single sentence.
+- No ethnic, racial, or religious markers
+- Do not mention text in images
+- When an image has a very young person in it , use 'child' or 'kid' instead of "girl" or "boy" to avoid misgendering
+- When an image has an adult in it, use "person" instead of "woman" or man" to avoid misgendering
 - Use a casual and conversational tone.
 - Prefer the word 'person' over 'individual'.
+- Use indefinite quantifiers such as 'a', 'some', 'many', 'few', or 'all'.
+- Do not count over two, always use indefinite quantifiers over two.
 - The text should be understandable by an 8 years old. Use the simplest words possible.
 - Try not to lose details of important elements, but keep it as concise as possible.
 - The JSON returned is an list of `alt_text` and `objects`

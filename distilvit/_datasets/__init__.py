@@ -2,6 +2,7 @@ from .coco import get_dataset as get_coco_dataset
 from .flickr import get_dataset as get_flickr_dataset
 from .docornot import get_dataset as get_docornot_dataset
 from .validation import get_dataset as get_validation_dataset
+from .pexels import get_dataset as get_pexels_dataset
 
 # from .textcaps import get_dataset as get_textcaps_dataset
 
@@ -11,4 +12,5 @@ DATASETS = {
     "docornot": get_docornot_dataset,
     # "textcaps": get_textcaps_dataset,
     "validation": get_validation_dataset,
+    "pexels": get_pexels_dataset,
 }
