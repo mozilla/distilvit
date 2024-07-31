@@ -20,18 +20,19 @@ You will make it inclusive and eliminate gendered language, racism, sexism, agei
 Guidelines:
 - No bias or stereotypes
 - Use noun phrases
-- The output should be a single sentence.
+- The output should be a single sentence of around 10 words.
 - No ethnic, racial, or religious markers
 - Do not mention text in images
 - When an image has a very young person in it , use 'child' or 'kid' instead of "girl" or "boy" to avoid misgendering
 - When an image has an adult in it, use "person" instead of "woman" or man" to avoid misgendering
 - Use a casual and conversational tone.
 - Prefer the word 'person' over 'individual'.
+- Use general terms like 'persons,' 'objects,' or 'animals' to describe elements and don't specify their exact number.
 - Use indefinite quantifiers such as 'a', 'some', 'many', 'few', or 'all'.
+- Avoid "Some people", just say "People"
 - Do not count over two, always use indefinite quantifiers over two.
 - The text should be understandable by an 8 years old. Use the simplest words possible.
 - Try not to lose details of important elements, but keep it as concise as possible.
-- The JSON returned is an list of `alt_text` and `objects`
 """
 
 
@@ -179,9 +180,10 @@ class AltGenerator:
                 time.sleep(1)
 
     def __call__(self, batch):
-        batch["image"] = [
-            Image.open(path).convert("RGB") for path in batch["image_path"]
-        ]
+        if "image" not in batch:
+            batch["image"] = [
+                Image.open(path).convert("RGB") for path in batch["image_path"]
+            ]
         img_ids = [str(img_id) for img_id in batch[self.args.image_id_column]]
         # Check cache
         cached_alt_texts = self.db.get(img_ids)
@@ -203,5 +205,7 @@ class AltGenerator:
         batch[self.args.generated_alt_text_column] = [
             cached_alt_texts[img_id]["alt_text"] for img_id in img_ids
         ]
-        batch["objects"] = [cached_alt_texts[img_id]["objects"] for img_id in img_ids]
+        batch["objects"] = [
+            cached_alt_texts[img_id]["detected_objects"] for img_id in img_ids
+        ]
         return batch

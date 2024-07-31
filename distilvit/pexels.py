@@ -87,9 +87,9 @@ def generate():
     pbar = tqdm(total=5000)
 
     image_files = [image for image in os.listdir("images") if image.endswith(".jpg")]
-
     image_by_id = {}
-    with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
         futures = []
         for i in range(0, len(image_files), 5):
             image_ids = image_files[i : i + 5]
@@ -104,7 +104,7 @@ def generate():
                 new_entry = {
                     "image_id": idx,
                     "alt_text": payload["alt_text"],
-                    "objects": payload["objects"],
+                    "objects": payload["detected_objects"],
                     "image": image_by_id[image_id],
                     "source": "pexels",
                 }
