@@ -20,22 +20,25 @@ bad_words = load_words_from_url(
     "https://raw.githubusercontent.com/snguyenthanh/better_profanity/master/better_profanity/profanity_wordlist.txt"
 )
 
-tokenizer_with_prefix_space = GPT2Tokenizer.from_pretrained(
-    model_name, add_prefix_space=True
-)
+tokenizer = GPT2Tokenizer.from_pretrained(model_name, add_prefix_space=True)
+
+
+vocab = tokenizer.get_vocab()
+vocab = [
+    tokenizer.convert_tokens_to_string(token).lower().strip() for token in vocab.keys()
+]
+vocab_bad_words = [word for word in vocab if word in bad_words]
 
 
 def get_tokens_as_list(word_list):
     tokens_list = []
     for word in word_list:
-        tokenized_word = tokenizer_with_prefix_space(
-            [word], add_special_tokens=False
-        ).input_ids[0]
+        tokenized_word = tokenizer([word], add_special_tokens=False).input_ids[0]
         tokens_list.append(tokenized_word)
     return tokens_list
 
 
-bad_word_ids = get_tokens_as_list(bad_words)
+bad_word_ids = get_tokens_as_list(vocab_bad_words)
 
 # save the new config on disk
 model = AutoModelForVision2Seq.from_pretrained(model_name)
