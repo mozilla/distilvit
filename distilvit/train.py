@@ -2,12 +2,12 @@ import os
 import sys
 import shutil
 
-
-os.environ["NCCL_P2P_DISABLE"] = "1"
-os.environ["NCCL_IB_DISABLE"] = "1"
-os.environ["PYTORCH_ENABLE_MPS_FALLBACK"] = "1"
-os.environ["WANDB_PROJECT"] = "distilvit"
-os.environ["WANDB_LOG_MODEL"] = "false"
+environ_dict = {"NCCL_P2P_DISABLE": "1",
+                "NCCL_IB_DISABLE": "1",
+                "PYTORCH_ENABLE_MPS_FALLBACK": "1",
+                "WANDB_PROJECT": "distilvit",
+                "WANDB_LOG_MODEL": "false"
+                }
 
 from functools import partial
 import torch
@@ -28,7 +28,6 @@ from transformers import (
 from transformers.trainer_utils import get_last_checkpoint
 from datasets import concatenate_datasets, DatasetDict
 from transformers.trainer_callback import EarlyStoppingCallback
-from codecarbon import track_emissions
 
 from distilvit._datasets import DATASETS
 from distilvit.quantize import main as quantize
@@ -43,10 +42,11 @@ def get_device():
     return "cpu"
 
 
-try:
-    nltk.data.find("tokenizers/punkt")
-except (LookupError, OSError):
-    nltk.download("punkt", quiet=True)
+def get_nltk():
+    try:
+        nltk.data.find("tokenizers/punkt")
+    except (LookupError, OSError):
+        nltk.download("punkt", quiet=True)
 
 
 ROOT_DIR = os.path.join(os.path.dirname(__file__), "..")
@@ -183,7 +183,7 @@ def data_collator(tokenizer, features):
     return batch
 
 
-def parse_args():
+def parse_args(arg_list=None):
     parser = argparse.ArgumentParser(
         description="Train a Vision Encoder Decoder Model",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
@@ -301,11 +301,11 @@ def parse_args():
         choices=list(DATASETS.keys()),
         help="Dataset to use for training",
     )
-    return parser.parse_args()
+    return parser.parse_args(arg_list)
 
 
-@track_emissions(project_name="mozilla/distilvit")
 def train(args):
+    get_nltk()
     rouge = evaluate.load("rouge")
     meteor = evaluate.load("meteor")
 
