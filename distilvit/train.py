@@ -6,8 +6,7 @@ environ_dict = {"NCCL_P2P_DISABLE": "1",
                 "NCCL_IB_DISABLE": "1",
                 "PYTORCH_ENABLE_MPS_FALLBACK": "1",
                 "WANDB_PROJECT": "distilvit",
-                "WANDB_LOG_MODEL": "false",
-                "dataset": "coco"
+                "WANDB_LOG_MODEL": "false"
                 }
 
 from functools import partial

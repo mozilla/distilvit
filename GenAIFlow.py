@@ -14,8 +14,10 @@ class GenAIFlow(FlowSpec):
 
     def params_to_args(self):
         args = []
-        for name, value in type(self).__dict__.items():
+        for name, value in self.__class__.__dict__.items():
             if name.startswith(MF_ARG_PREFIX):
-                if (value is not None and value != 0):
-                    args.append("--{name[len(MF_ARG_PREFIX):]}")
-                    args.append(value)
+                vv = getattr(self, name)
+                if (vv is not None and vv != 0):
+                    args.append(f"--{name[len(MF_ARG_PREFIX):]}")
+                    args.append(str(vv))
+        return args

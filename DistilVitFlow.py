@@ -17,10 +17,9 @@ class DistilVitFlow(GenAIFlow):
     def start(self):
         args = self.params_to_args()
 
-        print("Parsed args are as follows:")
-        print(args)
+        print(f"Parsed args are as follows:{args}")
 
-        train(args)
+        train(parse_args(args))
         self.next(self.end)
 
     @step
