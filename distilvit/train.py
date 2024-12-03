@@ -6,7 +6,8 @@ environ_dict = {"NCCL_P2P_DISABLE": "1",
                 "NCCL_IB_DISABLE": "1",
                 "PYTORCH_ENABLE_MPS_FALLBACK": "1",
                 "WANDB_PROJECT": "distilvit",
-                "WANDB_LOG_MODEL": "false"
+                "WANDB_LOG_MODEL": "false",
+                "dataset": "coco"
                 }
 
 from functools import partial
@@ -183,7 +184,7 @@ def data_collator(tokenizer, features):
     return batch
 
 
-def parse_args(arg_list=None):
+def get_arg_parser():
     parser = argparse.ArgumentParser(
         description="Train a Vision Encoder Decoder Model",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
@@ -301,6 +302,10 @@ def parse_args(arg_list=None):
         choices=list(DATASETS.keys()),
         help="Dataset to use for training",
     )
+    return parser
+
+def parse_args(arg_list=None):
+    parser = get_arg_parser()
     return parser.parse_args(arg_list)
 
 
