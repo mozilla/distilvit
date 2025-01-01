@@ -49,12 +49,9 @@ def get_nltk():
         nltk.download("punkt", quiet=True)
 
 
-ROOT_DIR = os.path.join(os.path.dirname(__file__), "..")
 MAX_LENGTH = 128
 THE_ANSWER_TO_LIFE_THE_UNIVERSE_AND_EVERYTHING = 42
 MODEL_ID = "mozilla/distilvit"
-MODEL_CARD = os.path.join(ROOT_DIR, "docs", "model_card.md")
-
 
 class MetricsLoggerCallback(TrainerCallback):
     def __init__(self, file_path):
@@ -183,7 +180,10 @@ def data_collator(tokenizer, features):
     return batch
 
 
-def get_arg_parser():
+def get_arg_parser(root_dir=None):
+    if root_dir is None:
+        root_dir = os.path.join(os.path.dirname(__file__), "..")
+
     parser = argparse.ArgumentParser(
         description="Train a Vision Encoder Decoder Model",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
@@ -212,14 +212,14 @@ def get_arg_parser():
 
     parser.add_argument(
         "--save-dir",
-        default=ROOT_DIR,
+        default=root_dir,
         type=str,
         help="Save dir",
     )
 
     parser.add_argument(
         "--cache-dir",
-        default=os.path.join(ROOT_DIR, "cache"),
+        default=os.path.join(root_dir, "cache"),
         type=str,
         help="Cache dir",
     )
@@ -233,7 +233,7 @@ def get_arg_parser():
 
     parser.add_argument(
         "--checkpoints-dir",
-        default=os.path.join(ROOT_DIR, "checkpoints"),
+        default=os.path.join(root_dir, "checkpoints"),
         type=str,
         help="Checkpoints dir",
     )
@@ -442,9 +442,7 @@ def train(args):
     finally:
         sys.argv = old
 
-    shutil.copyfile(MODEL_CARD, os.path.join(save_path, "README.md"))
-
-    print(f"Model saved to {save_path}")
+    print(f"Model saved to {save_path}. You may need to copy in model card in docs directory.")
 
     if args.push_to_hub:
         push_to_hub(args.model_id, save_path, args.tag, "New training")
