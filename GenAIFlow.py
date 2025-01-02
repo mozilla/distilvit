@@ -8,6 +8,7 @@ import argparse
 
 # Internal prefix for storing Metaflow parmeters
 MF_ARG_PREFIX = "mf_arg_"
+MF_ARG_MULTI_PREFIX = "mf_multiarg_"
 
 """
 This file has utility functions to make it easy to convert a command line-training job 
@@ -28,10 +29,12 @@ class GenAIFlow(FlowSpec):
     @classmethod
     def import_argparse_to_params(cls, parser):
         """
-        Given an arugment parser class using the standard python argparse library, construct
+        Given an argument parser class using the standard python argparse library, construct
         similar Metaflow parameters for the flow that can be triggered in the Metaflow command line
         or a provider UI (Such as Outerbounds). Arguments are have arg_ prefix added to them in the
         metaflow UI.
+
+        Multiple input arguments must be submitted as comma separated strings
 
         Supports most typical arguments and true flags (default if not set).
         """
@@ -47,6 +50,11 @@ class GenAIFlow(FlowSpec):
                                                                         type=bool,
                                                                         help=f"{action.help}",
                                                                         default=False))
+                elif action.nargs in ["*", "+"]:
+                    setattr(cls, MF_ARG_MULTI_PREFIX + action.dest, Parameter("arg_" + action.dest,
+                                                                    type=action.type or str,
+                                                                    help=f"{action.help} {(','.join(action.choices)) if action.choices is not None else ''}",
+                                                                    default=action.default))
                 else:
                     setattr(cls, MF_ARG_PREFIX + action.dest, Parameter("arg_" + action.dest,
                                                                     type=action.type or str,
@@ -67,6 +75,13 @@ class GenAIFlow(FlowSpec):
         """
         args = []
         for name, value in self.__class__.__dict__.items():
+            if name.startswith(MF_ARG_MULTI_PREFIX):
+                vv = getattr(self, name)
+                if vv not in (None, 0, '', False):
+                    args.append(f"--{name[len(MF_ARG_MULTI_PREFIX):].replace('_', '-')}")
+                    items = str(vv).split(",")
+                    for item in items:
+                        args.append(item)
             if name.startswith(MF_ARG_PREFIX):
                 vv = getattr(self, name)
                 if vv not in (None, 0, '', False):
