@@ -25,4 +25,4 @@ mysql-connector-python
 # for the converter
 onnxruntime==1.15.1
 optimum==1.13.2
-onnx==1.13.1
+onnx==1.16.0
