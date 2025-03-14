@@ -6,7 +6,7 @@ accelerate
 pandas
 datasets
 transformers[torch]==4.33.2
-accelerate
+accelerate==0.28.0
 numpy<2.0
 evaluate
 scikit-learn
